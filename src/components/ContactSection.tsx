@@ -8,8 +8,8 @@ const ContactSection = () => {
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="max-w-2xl mx-auto"
-      >
+        className="max-w-2xl mx-auto">
+
         <h2 className="text-xl md:text-3xl font-display font-bold text-center mb-8 neon-glow-red">
           Contact Us
         </h2>
@@ -53,7 +53,7 @@ const ContactSection = () => {
           <Clock size={18} className="text-primary flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-heading font-semibold mb-1">Business Hours</p>
-            <p className="text-xs text-muted-foreground">Mon – Sat: 9 AM – 8 PM</p>
+            <p className="text-foreground text-sm font-bold">Mon – Sat: 9 AM – 8 PM</p>
             <p className="text-xs text-secondary">Sunday: Closed</p>
           </div>
         </div>
@@ -63,8 +63,8 @@ const ContactSection = () => {
           href="https://maps.app.goo.gl/hsZwRRgjuvdUguUTA?g_st=aw"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/30 font-heading font-semibold py-3 px-4 rounded-full text-sm hover:bg-primary hover:text-primary-foreground transition-colors mb-6"
-        >
+          className="flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/30 font-heading font-semibold py-3 px-4 rounded-full text-sm hover:bg-primary hover:text-primary-foreground transition-colors mb-6">
+
           <Star size={16} /> Write a Review on Google
         </a>
 
@@ -78,21 +78,21 @@ const ContactSection = () => {
             allowFullScreen
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
-            title="Bikers Choice Kakinada Location"
-          />
+            title="Bikers Choice Kakinada Location" />
+
         </div>
 
         <a
           href="https://maps.app.goo.gl/hsZwRRgjuvdUguUTA?g_st=aw"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 text-primary text-sm font-heading mt-3 hover:underline"
-        >
+          className="flex items-center justify-center gap-2 text-primary text-sm font-heading mt-3 hover:underline">
+
           <MapPin size={14} /> Get Directions
         </a>
       </motion.div>
-    </section>
-  );
+    </section>);
+
 };
 
 export default ContactSection;
