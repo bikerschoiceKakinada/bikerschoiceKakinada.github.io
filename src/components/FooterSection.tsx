@@ -11,7 +11,7 @@ const FooterSection = () => {
         <h3 className="font-display font-bold text-sm mb-4">Bikers Choice Kakinada</h3>
 
         <div className="flex gap-4 mb-4">
-          <a href="tel:+918523876978" className="transition-colors text-accent-foreground"><Phone size={18} /></a>
+          <a href="tel:+918523876978" className="transition-colors text-muted-foreground"><Phone size={18} /></a>
           <a href="https://wa.me/918523876978" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors"><MessageCircle size={18} /></a>
           <a href="mailto:bikerschoicekakinada390@gmail.com" className="text-muted-foreground hover:text-primary transition-colors"><Mail size={18} /></a>
           <a href="https://www.instagram.com/bikers_choice_kakinada?igsh=MXN4NHd0bnRzY2p3dg==" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors"><Instagram size={18} /></a>
