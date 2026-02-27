@@ -61,7 +61,7 @@ const HeroSection = () => {
           href="https://maps.app.goo.gl/hsZwRRgjuvdUguUTA?g_st=aw"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors text-base font-semibold rounded-2xl border-orange-600">
+          className="inline-flex items-center gap-1.5 transition-colors text-base font-semibold rounded-2xl border-orange-600 text-orange-400">
 
           <MapPin size={12} /> Kakinada, Andhra Pradesh
         </a>
