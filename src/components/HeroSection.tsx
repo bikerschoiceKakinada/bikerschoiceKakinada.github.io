@@ -58,11 +58,10 @@ const HeroSection = () => {
 
         {/* Location */}
         <a
-
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 bg-card border border-border px-4 py-2.5 rounded-full text-sm font-heading font-semibold text-foreground hover:border-primary hover:text-primary transition-colors" href="https://maps.app.goo.gl/fL4Lk5HGVNdVyu2d8">
-          <MapPin size={16} className="text-secondary" /> Get Directions – Kakinada, AP
+          <MapPin size={16} className="text-secondary" /> Open Google Maps Directions
         </a>
       </motion.div>
 
