@@ -53,7 +53,7 @@ const ContactSection = () => {
           <Clock size={18} className="text-primary flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-heading font-semibold mb-1">Business Hours</p>
-            <p className="text-foreground text-sm font-bold">Mon – Sat: 9 AM – 8 PM</p>
+            <p className="text-foreground text-sm font-bold">Mon – Sat: 9 AM – 9:30 PM</p>
             <p className="text-sm font-bold text-foreground">Sunday:  9 AM – 1 PM </p>
           </div>
         </div>
