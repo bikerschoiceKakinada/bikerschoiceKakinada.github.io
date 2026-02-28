@@ -58,12 +58,11 @@ const HeroSection = () => {
 
         {/* Location */}
         <a
-          href="https://maps.app.goo.gl/hsZwRRgjuvdUguUTA?g_st=aw"
+          href="https://www.google.com/maps/dir/?api=1&destination=16.9891667,82.2466667"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 transition-colors text-base font-semibold text-orange-400 rounded-none">
-
-          <MapPin size={12} /> Kakinada, Andhra Pradesh
+          className="inline-flex items-center gap-2 bg-card border border-border px-4 py-2.5 rounded-full text-sm font-heading font-semibold text-foreground hover:border-primary hover:text-primary transition-colors">
+          <MapPin size={16} className="text-secondary" /> Get Directions – Kakinada, AP
         </a>
       </motion.div>
 

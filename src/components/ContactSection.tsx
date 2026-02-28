@@ -71,7 +71,7 @@ const ContactSection = () => {
         {/* Map */}
         <div className="rounded-xl overflow-hidden border border-border">
           <iframe
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3815.7!2d82.23!3d16.96!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTbCsDU3JzM2LjAiTiA4MsKwMTMnNDguMCJF!5e0!3m2!1sen!2sin!4v1234567890"
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1907.8!2d82.2466667!3d16.9891667!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a3829f1e1f5b4e1%3A0x2c89c68e2a2e4d8a!2sBikers%20Choice%20Kakinada!5e0!3m2!1sen!2sin!4v1709123456789"
             width="100%"
             height="250"
             style={{ border: 0 }}
@@ -79,16 +79,14 @@ const ContactSection = () => {
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
             title="Bikers Choice Kakinada Location" />
-
         </div>
 
         <a
-          href="https://maps.app.goo.gl/hsZwRRgjuvdUguUTA?g_st=aw"
+          href="https://www.google.com/maps/dir/?api=1&destination=16.9891667,82.2466667"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 text-primary text-sm font-heading mt-3 hover:underline">
-
-          <MapPin size={14} /> Get Directions
+          className="flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/30 font-heading font-semibold py-2.5 px-4 rounded-full text-sm mt-4 hover:bg-primary hover:text-primary-foreground transition-colors">
+          <MapPin size={16} /> Get Directions to Our Shop
         </a>
       </motion.div>
     </section>);

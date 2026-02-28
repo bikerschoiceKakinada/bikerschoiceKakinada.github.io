@@ -17,8 +17,10 @@ const AdminLogin = () => {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) throw error;
 
-      // Verify admin role
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("role", "admin");
+      // Verify admin role using user_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { await supabase.auth.signOut(); toast.error("Auth failed"); return; }
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
       if (!roles || roles.length === 0) {
         await supabase.auth.signOut();
         toast.error("Access denied. Admin only.");
