@@ -50,7 +50,7 @@ const HeroSection = () => {
           href="https://www.instagram.com/bikers_choice_kakinada?igsh=MXN4NHd0bnRzY2p3dg=="
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 bg-surface border border-border px-4 py-2 rounded-full text-xs text-muted-foreground hover:text-primary transition-colors mb-4 shadow">
+          className="inline-flex items-center gap-2 bg-surface border px-4 py-2 rounded-full text-xs text-muted-foreground hover:text-primary transition-colors mb-4 shadow font-semibold border-primary">
 
           <Instagram size={14} className="text-primary" />
           Follow us on Instagram – 4,800+ riders
