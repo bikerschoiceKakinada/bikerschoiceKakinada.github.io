@@ -8,6 +8,8 @@ import AdminGallery from "@/components/admin/AdminGallery";
 import AdminDelivery from "@/components/admin/AdminDelivery";
 import AdminSettings from "@/components/admin/AdminSettings";
 
+const ADMIN_EMAIL = "bikerschoicekakinada390@gmail.com";
+
 const tabs = [
   { id: "signature", label: "Signature Work", icon: Image },
   { id: "gallery", label: "Gallery", icon: LayoutGrid },
@@ -22,19 +24,37 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          navigate("/admin");
+          return;
+        }
+
+        if ((session.user.email ?? "").toLowerCase() !== ADMIN_EMAIL) {
+          await supabase.auth.signOut();
+          navigate("/admin");
+          return;
+        }
+
+        const { data: isAdmin, error } = await supabase.rpc("has_role", {
+          _user_id: session.user.id,
+          _role: "admin",
+        });
+
+        if (error || !isAdmin) {
+          await supabase.auth.signOut();
+          navigate("/admin");
+          return;
+        }
+
+        setLoading(false);
+      } catch {
+        toast.error("Could not verify admin session.");
         navigate("/admin");
-        return;
       }
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id).eq("role", "admin");
-      if (!roles || roles.length === 0) {
-        await supabase.auth.signOut();
-        navigate("/admin");
-        return;
-      }
-      setLoading(false);
     };
+
     checkAuth();
   }, [navigate]);
 
@@ -89,3 +109,4 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+

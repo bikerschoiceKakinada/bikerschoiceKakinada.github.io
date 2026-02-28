@@ -19,7 +19,7 @@ const FooterSection = () => {
         </div>
 
         <a
-          href="https://maps.app.goo.gl/hsZwRRgjuvdUguUTA?g_st=aw"
+          href="https://maps.app.goo.gl/fL4Lk5HGVNdVyu2d8"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline mb-6">
