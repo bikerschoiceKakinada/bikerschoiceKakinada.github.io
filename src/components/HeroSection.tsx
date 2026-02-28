@@ -58,10 +58,10 @@ const HeroSection = () => {
 
         {/* Location */}
         <a
-          href="https://www.google.com/maps/dir/?api=1&destination=16.9891667,82.2466667"
+
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 bg-card border border-border px-4 py-2.5 rounded-full text-sm font-heading font-semibold text-foreground hover:border-primary hover:text-primary transition-colors">
+          className="inline-flex items-center gap-2 bg-card border border-border px-4 py-2.5 rounded-full text-sm font-heading font-semibold text-foreground hover:border-primary hover:text-primary transition-colors" href="https://maps.app.goo.gl/fL4Lk5HGVNdVyu2d8">
           <MapPin size={16} className="text-secondary" /> Get Directions – Kakinada, AP
         </a>
       </motion.div>
