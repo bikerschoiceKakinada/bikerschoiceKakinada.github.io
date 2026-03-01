@@ -3,6 +3,12 @@ import type { Config } from "@netlify/functions";
 
 const INSTAGRAM_USERNAME_FALLBACK = "bikers_choice_kakinada";
 
+// Hardcoded fallbacks — these are public (anon) credentials already exposed
+// via the VITE_ prefix in the client bundle, so embedding them here is safe.
+const SUPABASE_URL_FALLBACK = "https://uhhbhdzifhjzctkpduio.supabase.co";
+const SUPABASE_KEY_FALLBACK =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoaGJoZHppZmhqemN0a3BkdWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNzcyNjksImV4cCI6MjA4Nzc1MzI2OX0.ahyJCds9XMrNfBFWb6nfX0lox69MGsyAODrYw3-4XpA";
+
 function parseInstagramUsername(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
@@ -24,8 +30,8 @@ function parseInstagramUsername(raw: string | null | undefined): string | null {
 }
 
 async function resolveInstagramUsername(): Promise<string> {
-  const url = process.env.VITE_SUPABASE_URL;
-  const key = process.env.VITE_SUPABASE_ANON_KEY;
+  const url = process.env.VITE_SUPABASE_URL || SUPABASE_URL_FALLBACK;
+  const key = process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_KEY_FALLBACK;
   if (!url || !key) return INSTAGRAM_USERNAME_FALLBACK;
 
   try {
@@ -197,8 +203,8 @@ async function fetchWithRetry(username: string, maxRetries = 2): Promise<number 
 }
 
 async function updateSupabase(count: number): Promise<boolean> {
-  const url = process.env.VITE_SUPABASE_URL;
-  const key = process.env.VITE_SUPABASE_ANON_KEY;
+  const url = process.env.VITE_SUPABASE_URL || SUPABASE_URL_FALLBACK;
+  const key = process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_KEY_FALLBACK;
   if (!url || !key) {
     console.error("[auto-update] Supabase env vars not set");
     return false;

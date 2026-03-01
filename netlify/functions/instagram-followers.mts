@@ -7,9 +7,15 @@ const CACHE_KEY = "instagram-followers";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_FOLLOWERS = 4800;
 
+// Hardcoded fallbacks — these are public (anon) credentials already exposed
+// via the VITE_ prefix in the client bundle, so embedding them here is safe.
+const SUPABASE_URL_FALLBACK = "https://uhhbhdzifhjzctkpduio.supabase.co";
+const SUPABASE_KEY_FALLBACK =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoaGJoZHppZmhqemN0a3BkdWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNzcyNjksImV4cCI6MjA4Nzc1MzI2OX0.ahyJCds9XMrNfBFWb6nfX0lox69MGsyAODrYw3-4XpA";
+
 function getSupabaseClient() {
-  const url = process.env.VITE_SUPABASE_URL;
-  const key = process.env.VITE_SUPABASE_ANON_KEY;
+  const url = process.env.VITE_SUPABASE_URL || SUPABASE_URL_FALLBACK;
+  const key = process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_KEY_FALLBACK;
   if (!url || !key) return null;
   return createClient(url, key);
 }

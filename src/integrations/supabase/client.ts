@@ -1,8 +1,14 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Hardcoded fallbacks — these are public (anon) credentials already exposed
+// via the VITE_ prefix in the client bundle, so embedding them here is safe.
+const SUPABASE_URL_FALLBACK = "https://uhhbhdzifhjzctkpduio.supabase.co";
+const SUPABASE_KEY_FALLBACK =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoaGJoZHppZmhqemN0a3BkdWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNzcyNjksImV4cCI6MjA4Nzc1MzI2OX0.ahyJCds9XMrNfBFWb6nfX0lox69MGsyAODrYw3-4XpA";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || SUPABASE_URL_FALLBACK;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || SUPABASE_KEY_FALLBACK;
 
 /**
  * Returns true when the Supabase environment variables are present and
