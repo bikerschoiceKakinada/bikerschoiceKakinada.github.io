@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, Plus, ChevronRight, ArrowLeft, ImagePlus } from "lucide-react";
@@ -18,44 +18,56 @@ const AdminDelivery = () => {
   const [syncing, setSyncing] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  if (!isSupabaseConfigured() || !supabase) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground text-sm">Database not configured. Please set Supabase environment variables.</p>
-      </div>
-    );
-  }
+  const configured = isSupabaseConfigured() && supabase;
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
+    if (!configured) {
+      setLoaded(true);
+      return;
+    }
     try {
-      const { data, error } = await supabase.from("delivery_categories").select("*").order("order_index");
+      const { data, error } = await supabase!.from("delivery_categories").select("*").order("order_index");
       if (error) {
         console.error("[AdminDelivery] Fetch categories error:", error);
+        toast.error("Failed to fetch categories: " + error.message);
         setLoaded(true);
         return;
       }
       if (data) setCategories(data);
     } catch (err) {
       console.error("[AdminDelivery] Fetch categories failed:", err);
+      toast.error("Failed to fetch categories. Please check your connection.");
     }
     setLoaded(true);
-  };
+  }, [configured]);
 
-  const fetchItems = async (catId: string) => {
+  const fetchItems = useCallback(async (catId: string) => {
+    if (!configured) return;
     try {
-      const { data, error } = await supabase.from("delivery_items").select("*").eq("category_id", catId).order("order_index");
+      const { data, error } = await supabase!.from("delivery_items").select("*").eq("category_id", catId).order("order_index");
       if (error) {
         console.error("[AdminDelivery] Fetch items error:", error);
+        toast.error("Failed to fetch items: " + error.message);
         return;
       }
       if (data) setItems(data);
     } catch (err) {
       console.error("[AdminDelivery] Fetch items failed:", err);
+      toast.error("Failed to fetch items. Please check your connection.");
     }
-  };
+  }, [configured]);
 
-  useEffect(() => { fetchCategories(); }, []);
-  useEffect(() => { if (selectedCat) fetchItems(selectedCat.id); }, [selectedCat]);
+  useEffect(() => { fetchCategories(); }, [fetchCategories]);
+  useEffect(() => { if (selectedCat) fetchItems(selectedCat.id); }, [selectedCat, fetchItems]);
+
+  // Early return AFTER all hooks to comply with React Rules of Hooks
+  if (!configured) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground text-sm">Database not configured. Please set Supabase environment variables.</p>
+      </div>
+    );
+  }
 
   const addCategory = async () => {
     const trimmed = newCatName.trim();
@@ -65,10 +77,10 @@ const AdminDelivery = () => {
     }
     setAdding(true);
     try {
-      const { error } = await supabase.from("delivery_categories").insert({ name: trimmed, order_index: categories.length });
+      const { error } = await supabase!.from("delivery_categories").insert({ name: trimmed, order_index: categories.length });
       if (error) {
         console.error("[AdminDelivery] Add category error:", error);
-        toast.error("Failed to add category: " + error.message);
+        toast.error("Failed to save category: " + error.message);
         setAdding(false);
         return;
       }
@@ -77,19 +89,19 @@ const AdminDelivery = () => {
       toast.success("Category added");
     } catch (err) {
       console.error("[AdminDelivery] Add category failed:", err);
-      toast.error("Failed to add category");
+      toast.error("Failed to save category. Please try again.");
     }
     setAdding(false);
   };
 
   const deleteCategory = async (id: string) => {
     try {
-      const { error: itemsError } = await supabase.from("delivery_items").delete().eq("category_id", id);
+      const { error: itemsError } = await supabase!.from("delivery_items").delete().eq("category_id", id);
       if (itemsError) {
         toast.error("Failed to delete category items: " + itemsError.message);
         return;
       }
-      const { error } = await supabase.from("delivery_categories").delete().eq("id", id);
+      const { error } = await supabase!.from("delivery_categories").delete().eq("id", id);
       if (error) {
         toast.error("Failed to delete category: " + error.message);
         return;
@@ -105,7 +117,7 @@ const AdminDelivery = () => {
 
   const renameCategory = async (id: string, name: string) => {
     try {
-      const { error } = await supabase.from("delivery_categories").update({ name }).eq("id", id);
+      const { error } = await supabase!.from("delivery_categories").update({ name }).eq("id", id);
       if (error) {
         toast.error("Failed to rename category: " + error.message);
         return;
@@ -124,10 +136,10 @@ const AdminDelivery = () => {
       const file = e.target.files[0];
       const ext = file.name.split(".").pop();
       const path = `delivery/thumbnails/${catId}_${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("uploads").upload(path, file);
+      const { error } = await supabase!.storage.from("uploads").upload(path, file);
       if (error) { toast.error("Thumbnail upload failed: " + error.message); setUploadingThumb(null); return; }
-      const { data } = supabase.storage.from("uploads").getPublicUrl(path);
-      const { error: updateError } = await supabase.from("delivery_categories").update({ icon_url: data.publicUrl }).eq("id", catId);
+      const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
+      const { error: updateError } = await supabase!.from("delivery_categories").update({ icon_url: data.publicUrl }).eq("id", catId);
       if (updateError) { toast.error("Failed to save thumbnail: " + updateError.message); setUploadingThumb(null); return; }
       await fetchCategories();
       toast.success("Thumbnail updated");
@@ -146,10 +158,10 @@ const AdminDelivery = () => {
       const file = e.target.files[0];
       const ext = file.name.split(".").pop();
       const path = `delivery/${selectedCat.id}/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("uploads").upload(path, file);
+      const { error } = await supabase!.storage.from("uploads").upload(path, file);
       if (error) { toast.error("Upload failed: " + error.message); setUploading(false); return; }
-      const { data } = supabase.storage.from("uploads").getPublicUrl(path);
-      const { error: insertError } = await supabase.from("delivery_items").insert({ category_id: selectedCat.id, image_url: data.publicUrl, label: "", order_index: items.length });
+      const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
+      const { error: insertError } = await supabase!.from("delivery_items").insert({ category_id: selectedCat.id, image_url: data.publicUrl, label: "", order_index: items.length });
       if (insertError) { toast.error("Failed to add item: " + insertError.message); setUploading(false); return; }
       await fetchItems(selectedCat.id);
       toast.success("Item added");
@@ -164,7 +176,7 @@ const AdminDelivery = () => {
   const deleteItem = async (id: string) => {
     if (!selectedCat) return;
     try {
-      const { error } = await supabase.from("delivery_items").delete().eq("id", id);
+      const { error } = await supabase!.from("delivery_items").delete().eq("id", id);
       if (error) { toast.error("Failed to delete item: " + error.message); return; }
       await fetchItems(selectedCat.id);
       toast.success("Item deleted");
@@ -176,8 +188,11 @@ const AdminDelivery = () => {
 
   const updateItemLabel = async (id: string, label: string) => {
     try {
-      const { error } = await supabase.from("delivery_items").update({ label }).eq("id", id);
-      if (error) console.error("[AdminDelivery] Update label error:", error);
+      const { error } = await supabase!.from("delivery_items").update({ label }).eq("id", id);
+      if (error) {
+        console.error("[AdminDelivery] Update label error:", error);
+        toast.error("Failed to update label");
+      }
     } catch (err) {
       console.error("[AdminDelivery] Update label failed:", err);
     }
@@ -197,13 +212,13 @@ const AdminDelivery = () => {
         const blob = await response.blob();
         const ext = cat.icon_url.includes(".png") ? "png" : "jpg";
         const path = `delivery/thumbnails/${Date.now()}_${i}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from("uploads").upload(path, blob);
+        const { error: uploadError } = await supabase!.storage.from("uploads").upload(path, blob);
         if (uploadError) {
           console.error("[AdminDelivery] Upload category thumbnail failed:", uploadError);
           continue;
         }
-        const { data: urlData } = supabase.storage.from("uploads").getPublicUrl(path);
-        const { data: inserted, error: insertError } = await supabase
+        const { data: urlData } = supabase!.storage.from("uploads").getPublicUrl(path);
+        const { data: inserted, error: insertError } = await supabase!
           .from("delivery_categories")
           .insert({ name: cat.name, icon_url: urlData.publicUrl, order_index: cat.order_index })
           .select("id")
@@ -227,13 +242,13 @@ const AdminDelivery = () => {
           const blob = await response.blob();
           const ext = item.image_url.includes(".png") ? "png" : "jpg";
           const path = `delivery/${newCatId}/${Date.now()}_${i}.${ext}`;
-          const { error: uploadError } = await supabase.storage.from("uploads").upload(path, blob);
+          const { error: uploadError } = await supabase!.storage.from("uploads").upload(path, blob);
           if (uploadError) {
             console.error("[AdminDelivery] Upload item failed:", uploadError);
             continue;
           }
-          const { data: urlData } = supabase.storage.from("uploads").getPublicUrl(path);
-          const { error: insertError } = await supabase.from("delivery_items").insert({
+          const { data: urlData } = supabase!.storage.from("uploads").getPublicUrl(path);
+          const { error: insertError } = await supabase!.from("delivery_items").insert({
             category_id: newCatId,
             image_url: urlData.publicUrl,
             label: item.label,
@@ -368,7 +383,7 @@ const AdminDelivery = () => {
           </div>
         ))}
       </div>
-      {categories.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">No categories yet.</p>}
+      {categories.length === 0 && !showFallback && <p className="text-muted-foreground text-sm text-center py-8">No categories yet.</p>}
     </div>
   );
 };

@@ -58,13 +58,17 @@ function parseFollowerCount(raw: string): number {
 async function fetchFromInstagram(username: string): Promise<number | null> {
   const instagramUrl = `https://www.instagram.com/${username}/`;
   const userAgents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
   ];
   const ua = userAgents[Math.floor(Math.random() * userAgents.length)];
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch(instagramUrl, {
       headers: {
         "User-Agent": ua,
@@ -79,7 +83,10 @@ async function fetchFromInstagram(username: string): Promise<number | null> {
         "Upgrade-Insecure-Requests": "1",
       },
       redirect: "follow",
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.error(`[auto-update] Instagram returned ${response.status}`);
@@ -146,12 +153,47 @@ async function fetchFromInstagram(username: string): Promise<number | null> {
       }
     }
 
+    // Strategy 5: follower_count in JSON blocks
+    const followerCountPattern = /"follower_count"\s*:\s*(\d+)/;
+    const followerCountMatch = html.match(followerCountPattern);
+    if (followerCountMatch) {
+      const count = parseInt(followerCountMatch[1], 10);
+      if (count > 0) {
+        console.log(`[auto-update] Parsed from follower_count JSON: ${count}`);
+        return count;
+      }
+    }
+
+    // Strategy 6: Generic "X Followers" pattern in HTML
+    const genericPattern = />([\d,\.]+[KkMm]?)\s*Followers</i;
+    const genericMatch = html.match(genericPattern);
+    if (genericMatch) {
+      const count = parseFollowerCount(genericMatch[1]);
+      if (count > 0) {
+        console.log(`[auto-update] Parsed from generic HTML pattern: ${count}`);
+        return count;
+      }
+    }
+
     console.warn("[auto-update] Could not parse follower count from page");
     return null;
   } catch (err) {
     console.error("[auto-update] Fetch error:", err);
     return null;
   }
+}
+
+async function fetchWithRetry(username: string, maxRetries = 2): Promise<number | null> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      // Wait before retrying (1s, then 2s)
+      await new Promise((r) => setTimeout(r, attempt * 1000));
+      console.log(`[auto-update] Retry attempt ${attempt}/${maxRetries}`);
+    }
+    const result = await fetchFromInstagram(username);
+    if (result && result > 0) return result;
+  }
+  return null;
 }
 
 async function updateSupabase(count: number): Promise<boolean> {
@@ -205,7 +247,7 @@ export default async () => {
   console.log("[auto-update] Starting scheduled Instagram follower update...");
 
   const username = await resolveInstagramUsername();
-  const count = await fetchFromInstagram(username);
+  const count = await fetchWithRetry(username);
 
   if (count && count > 0) {
     const updated = await updateSupabase(count);
@@ -215,7 +257,7 @@ export default async () => {
         : "[auto-update] Fetched count but failed to store in Supabase"
     );
   } else {
-    console.log("[auto-update] Could not fetch follower count from Instagram — skipping update");
+    console.log("[auto-update] Could not fetch follower count from Instagram after retries — skipping update");
   }
 };
 

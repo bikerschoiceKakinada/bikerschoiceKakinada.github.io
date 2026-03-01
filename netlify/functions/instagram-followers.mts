@@ -119,13 +119,17 @@ async function resolveInstagramUsername(): Promise<string> {
 async function fetchFromInstagram(username: string): Promise<number | null> {
   const instagramUrl = `https://www.instagram.com/${username}/`;
   const userAgents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
   ];
   const ua = userAgents[Math.floor(Math.random() * userAgents.length)];
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch(instagramUrl, {
       headers: {
         "User-Agent": ua,
@@ -140,7 +144,10 @@ async function fetchFromInstagram(username: string): Promise<number | null> {
         "Upgrade-Insecure-Requests": "1",
       },
       redirect: "follow",
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.error(`[instagram-followers] Instagram returned ${response.status}`);
@@ -204,6 +211,28 @@ async function fetchFromInstagram(username: string): Promise<number | null> {
           console.log(`[instagram-followers] Parsed from title: ${count}`);
           return count;
         }
+      }
+    }
+
+    // Strategy 5: window._sharedData or similar JSON blocks
+    const sharedDataPattern = /"follower_count"\s*:\s*(\d+)/;
+    const sharedDataMatch = html.match(sharedDataPattern);
+    if (sharedDataMatch) {
+      const count = parseInt(sharedDataMatch[1], 10);
+      if (count > 0) {
+        console.log(`[instagram-followers] Parsed from follower_count JSON: ${count}`);
+        return count;
+      }
+    }
+
+    // Strategy 6: Any "X Followers" pattern in the HTML body
+    const genericFollowerPattern = />([\d,\.]+[KkMm]?)\s*Followers</i;
+    const genericMatch = html.match(genericFollowerPattern);
+    if (genericMatch) {
+      const count = parseFollowerCount(genericMatch[1]);
+      if (count > 0) {
+        console.log(`[instagram-followers] Parsed from generic HTML pattern: ${count}`);
+        return count;
       }
     }
 
