@@ -2,17 +2,18 @@ import { useState, useEffect } from "react";
 import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, RefreshCw } from "lucide-react";
+import { DEFAULT_SETTINGS } from "@/hooks/useSiteSettings";
 
 const AdminSettings = () => {
   const [settings, setSettings] = useState({
     id: "",
-    hero_subtitle: "",
-    instagram_followers: "",
-    map_embed: "",
-    working_hours: "",
-    instagram_link: "",
-    facebook_link: "",
-    online_delivery_button_enabled: true,
+    hero_subtitle: DEFAULT_SETTINGS.hero_subtitle,
+    instagram_followers: DEFAULT_SETTINGS.instagram_followers,
+    map_embed: DEFAULT_SETTINGS.map_embed,
+    working_hours: DEFAULT_SETTINGS.working_hours,
+    instagram_link: DEFAULT_SETTINGS.instagram_link,
+    facebook_link: DEFAULT_SETTINGS.facebook_link,
+    online_delivery_button_enabled: DEFAULT_SETTINGS.online_delivery_button_enabled,
   });
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,17 +31,28 @@ const AdminSettings = () => {
         if (data) {
           setSettings({
             id: data.id,
-            hero_subtitle: data.hero_subtitle || "",
-            instagram_followers: data.instagram_followers || "",
-            map_embed: data.map_embed || "",
-            working_hours: data.working_hours || "",
-            instagram_link: data.instagram_link || "",
-            facebook_link: data.facebook_link || "",
-            online_delivery_button_enabled: data.online_delivery_button_enabled ?? true,
+            hero_subtitle: data.hero_subtitle || DEFAULT_SETTINGS.hero_subtitle,
+            instagram_followers: data.instagram_followers || DEFAULT_SETTINGS.instagram_followers,
+            map_embed: data.map_embed || DEFAULT_SETTINGS.map_embed,
+            working_hours: data.working_hours || DEFAULT_SETTINGS.working_hours,
+            instagram_link: data.instagram_link || DEFAULT_SETTINGS.instagram_link,
+            facebook_link: data.facebook_link || DEFAULT_SETTINGS.facebook_link,
+            online_delivery_button_enabled: data.online_delivery_button_enabled ?? DEFAULT_SETTINGS.online_delivery_button_enabled,
           });
           if (data.updated_at) {
             setLastUpdated(new Date(data.updated_at).toLocaleString());
           }
+        } else {
+          setSettings((prev) => ({
+            ...prev,
+            hero_subtitle: DEFAULT_SETTINGS.hero_subtitle,
+            instagram_followers: DEFAULT_SETTINGS.instagram_followers,
+            map_embed: DEFAULT_SETTINGS.map_embed,
+            working_hours: DEFAULT_SETTINGS.working_hours,
+            instagram_link: DEFAULT_SETTINGS.instagram_link,
+            facebook_link: DEFAULT_SETTINGS.facebook_link,
+            online_delivery_button_enabled: DEFAULT_SETTINGS.online_delivery_button_enabled,
+          }));
         }
       } catch (err) {
         console.error("[AdminSettings] Unexpected error:", err);
@@ -93,6 +105,20 @@ const AdminSettings = () => {
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const handleUseDefaults = () => {
+    setSettings((prev) => ({
+      ...prev,
+      hero_subtitle: DEFAULT_SETTINGS.hero_subtitle,
+      instagram_followers: DEFAULT_SETTINGS.instagram_followers,
+      map_embed: DEFAULT_SETTINGS.map_embed,
+      working_hours: DEFAULT_SETTINGS.working_hours,
+      instagram_link: DEFAULT_SETTINGS.instagram_link,
+      facebook_link: DEFAULT_SETTINGS.facebook_link,
+      online_delivery_button_enabled: DEFAULT_SETTINGS.online_delivery_button_enabled,
+    }));
+    toast.success("Loaded website defaults");
   };
 
   const handleSave = async () => {
@@ -202,6 +228,12 @@ const AdminSettings = () => {
           <div className={`w-4 h-4 bg-foreground rounded-full transition-transform mx-0.5 ${settings.online_delivery_button_enabled ? "translate-x-5" : ""}`} />
         </button>
       </div>
+      <button
+        onClick={handleUseDefaults}
+        className="flex items-center gap-2 bg-muted text-muted-foreground font-heading font-semibold py-2.5 px-4 rounded-full text-xs hover:text-foreground hover:border-primary border border-border transition-colors"
+      >
+        <RefreshCw size={14} /> Load Website Defaults
+      </button>
       <button
         onClick={handleSave}
         disabled={saving}

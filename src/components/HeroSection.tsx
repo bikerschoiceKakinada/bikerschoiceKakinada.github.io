@@ -1,47 +1,11 @@
-import { useState, useEffect } from "react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { motion } from "framer-motion";
 import { MessageCircle, Phone, Instagram, MapPin, Truck } from "lucide-react";
-import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.jpeg";
 import InstagramCounter from "./InstagramCounter";
 
 const HeroSection = () => {
-  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured() || !supabase) return;
-
-    const fetchSetting = async () => {
-      try {
-        const { data } = await supabase
-          .from("site_settings")
-          .select("online_delivery_button_enabled")
-          .limit(1)
-          .maybeSingle();
-        if (data && data.online_delivery_button_enabled !== null) {
-          setDeliveryEnabled(data.online_delivery_button_enabled);
-        }
-      } catch (err) {
-        console.error("[HeroSection] Fetch setting failed:", err);
-      }
-    };
-    fetchSetting();
-
-    const channel = supabase
-      .channel("hero-delivery-toggle")
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "site_settings" },
-        (payload) => {
-          if (payload.new?.online_delivery_button_enabled !== undefined) {
-            setDeliveryEnabled(payload.new.online_delivery_button_enabled);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+  const { settings } = useSiteSettings();
 
   return (
     <section id="home" className="relative min-h-screen flex flex-col items-center justify-center px-4 pt-16 pb-10 overflow-hidden">
@@ -64,7 +28,7 @@ const HeroSection = () => {
         </h1>
 
         <p className="text-sm md:text-base text-muted-foreground max-w-xl mb-6 font-body">
-          Premium aggressive custom-styled bikes with LED mods, painting, wraps, touring setups & precision finishing.
+          {settings.hero_subtitle}
         </p>
 
         {/* CTAs */}
@@ -87,7 +51,7 @@ const HeroSection = () => {
 
         {/* Instagram Badge with live counter */}
         <a
-          href="https://www.instagram.com/bikers_choice_kakinada?igsh=MXN4NHd0bnRzY2p3dg=="
+          href={settings.instagram_link}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 bg-surface border px-4 py-2 rounded-full text-xs text-muted-foreground hover:text-primary transition-colors mb-4 shadow font-semibold border-primary">
@@ -106,7 +70,7 @@ const HeroSection = () => {
       </motion.div>
 
       {/* Floating Online Delivery Button - controlled by admin settings */}
-      {deliveryEnabled && (
+      {settings.online_delivery_button_enabled && (
         <a
           href="#delivery"
           className="fixed bottom-20 right-4 z-40 flex items-center gap-2 bg-primary text-primary-foreground font-heading font-bold py-2.5 px-4 rounded-full text-xs shadow-lg neon-border-cyan animate-pulse-neon hover:scale-110 transition-transform">

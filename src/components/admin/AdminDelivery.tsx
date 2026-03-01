@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, Plus, ChevronRight, ArrowLeft, ImagePlus } from "lucide-react";
+import { DEFAULT_DELIVERY_CATEGORIES, DEFAULT_DELIVERY_ITEMS } from "@/lib/mediaDefaults";
 
 type Category = { id: string; name: string; icon_url: string | null; order_index: number };
 type Item = { id: string; category_id: string; image_url: string; label: string; order_index: number };
@@ -14,6 +15,8 @@ const AdminDelivery = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadingThumb, setUploadingThumb] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   if (!isSupabaseConfigured() || !supabase) {
     return (
@@ -28,12 +31,14 @@ const AdminDelivery = () => {
       const { data, error } = await supabase.from("delivery_categories").select("*").order("order_index");
       if (error) {
         console.error("[AdminDelivery] Fetch categories error:", error);
+        setLoaded(true);
         return;
       }
       if (data) setCategories(data);
     } catch (err) {
       console.error("[AdminDelivery] Fetch categories failed:", err);
     }
+    setLoaded(true);
   };
 
   const fetchItems = async (catId: string) => {
@@ -178,6 +183,83 @@ const AdminDelivery = () => {
     }
   };
 
+  const showFallback = loaded && categories.length === 0;
+
+  const handleSyncDefaults = async () => {
+    setSyncing(true);
+    try {
+      const categoryIdMap = new Map<string, string>();
+      let successCats = 0;
+
+      for (let i = 0; i < DEFAULT_DELIVERY_CATEGORIES.length; i++) {
+        const cat = DEFAULT_DELIVERY_CATEGORIES[i];
+        const response = await fetch(cat.icon_url);
+        const blob = await response.blob();
+        const ext = cat.icon_url.includes(".png") ? "png" : "jpg";
+        const path = `delivery/thumbnails/${Date.now()}_${i}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from("uploads").upload(path, blob);
+        if (uploadError) {
+          console.error("[AdminDelivery] Upload category thumbnail failed:", uploadError);
+          continue;
+        }
+        const { data: urlData } = supabase.storage.from("uploads").getPublicUrl(path);
+        const { data: inserted, error: insertError } = await supabase
+          .from("delivery_categories")
+          .insert({ name: cat.name, icon_url: urlData.publicUrl, order_index: cat.order_index })
+          .select("id")
+          .single();
+        if (insertError || !inserted) {
+          console.error("[AdminDelivery] Insert category failed:", insertError);
+          continue;
+        }
+        categoryIdMap.set(cat.id, inserted.id);
+        successCats++;
+      }
+
+      let successItems = 0;
+      for (const [fallbackId, itemsList] of Object.entries(DEFAULT_DELIVERY_ITEMS)) {
+        const newCatId = categoryIdMap.get(fallbackId);
+        if (!newCatId) continue;
+
+        for (let i = 0; i < itemsList.length; i++) {
+          const item = itemsList[i];
+          const response = await fetch(item.image_url);
+          const blob = await response.blob();
+          const ext = item.image_url.includes(".png") ? "png" : "jpg";
+          const path = `delivery/${newCatId}/${Date.now()}_${i}.${ext}`;
+          const { error: uploadError } = await supabase.storage.from("uploads").upload(path, blob);
+          if (uploadError) {
+            console.error("[AdminDelivery] Upload item failed:", uploadError);
+            continue;
+          }
+          const { data: urlData } = supabase.storage.from("uploads").getPublicUrl(path);
+          const { error: insertError } = await supabase.from("delivery_items").insert({
+            category_id: newCatId,
+            image_url: urlData.publicUrl,
+            label: item.label,
+            order_index: item.order_index,
+          });
+          if (insertError) {
+            console.error("[AdminDelivery] Insert item failed:", insertError);
+            continue;
+          }
+          successItems++;
+        }
+      }
+
+      await fetchCategories();
+      if (successCats > 0) {
+        toast.success(`Synced ${successCats} categories and ${successItems} items`);
+      } else {
+        toast.error("Sync failed — could not upload any categories");
+      }
+    } catch (err) {
+      console.error("[AdminDelivery] Sync failed:", err);
+      toast.error("Sync failed");
+    }
+    setSyncing(false);
+  };
+
   if (selectedCat) {
     return (
       <div>
@@ -218,6 +300,34 @@ const AdminDelivery = () => {
   return (
     <div>
       <h2 className="font-heading font-bold text-base mb-4">Delivery Categories</h2>
+      {showFallback && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3 bg-card border border-primary/30 rounded-lg p-3">
+            <div>
+              <p className="text-xs font-heading font-semibold text-primary">Default Delivery Photos Showing on Main Page</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Sync them to edit categories and items from this panel.</p>
+            </div>
+            <button
+              onClick={handleSyncDefaults}
+              disabled={syncing}
+              className={`flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-heading whitespace-nowrap ${syncing ? "opacity-50" : ""}`}
+            >
+              {syncing ? "Syncing..." : "Sync to DB"}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {DEFAULT_DELIVERY_CATEGORIES.map((cat) => (
+              <div key={cat.id} className="bg-card border border-border border-dashed rounded-lg overflow-hidden opacity-75">
+                <img src={cat.icon_url} alt={cat.name} className="w-full h-24 object-cover" />
+                <div className="p-2">
+                  <p className="text-xs text-muted-foreground">{cat.name}</p>
+                  <p className="text-[10px] text-muted-foreground/60">Default — sync to edit</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="flex gap-2 mb-4">
         <input
           type="text"

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
+import { DEFAULT_DELIVERY_ITEMS } from "@/lib/mediaDefaults";
 
 export type DeliveryItem = {
   id: string;
@@ -10,7 +11,7 @@ export type DeliveryItem = {
   created_at: string;
 };
 
-export function useDeliveryItems(categoryId: string | null) {
+export function useDeliveryItems(categoryId: string | null, useFallback = false) {
   const [items, setItems] = useState<DeliveryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,10 +22,29 @@ export function useDeliveryItems(categoryId: string | null) {
       return;
     }
 
+    if (useFallback) {
+      const fallbackItems = DEFAULT_DELIVERY_ITEMS[categoryId] || [];
+      setItems(
+        fallbackItems.map((item, index) => ({
+          id: `${categoryId}-${index}`,
+          category_id: categoryId,
+          image_url: item.image_url,
+          label: item.label,
+          order_index: item.order_index,
+          created_at: "",
+        }))
+      );
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     if (!isSupabaseConfigured() || !supabase) {
       setError("Supabase not configured");
       return;
     }
+
+    let active = true;
 
     const fetchItems = async () => {
       setLoading(true);
@@ -35,6 +55,8 @@ export function useDeliveryItems(categoryId: string | null) {
           .eq("category_id", categoryId)
           .order("order_index");
 
+        if (!active) return;
+
         if (err) {
           setError(err.message);
         } else {
@@ -42,14 +64,34 @@ export function useDeliveryItems(categoryId: string | null) {
         }
       } catch (err) {
         console.error("[useDeliveryItems] Fetch failed:", err);
-        setError("Failed to load items");
+        if (active) setError("Failed to load items");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchItems();
-  }, [categoryId]);
+
+    const channel = supabase
+      .channel(`delivery-items-${categoryId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "delivery_items" },
+        (payload) => {
+          const newCategory = (payload.new as { category_id?: string })?.category_id;
+          const oldCategory = (payload.old as { category_id?: string })?.category_id;
+          if (newCategory === categoryId || oldCategory === categoryId) {
+            fetchItems();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [categoryId, useFallback]);
 
   return { items, loading, error };
 }

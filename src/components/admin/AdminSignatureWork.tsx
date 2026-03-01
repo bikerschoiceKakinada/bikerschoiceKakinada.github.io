@@ -2,11 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, Plus, RefreshCw } from "lucide-react";
-import bike1 from "@/assets/bike1.png";
-import bike2 from "@/assets/bike2.png";
-import bike3 from "@/assets/bike3.png";
-import bike4 from "@/assets/bike4.png";
-import bike5 from "@/assets/bike5.png";
+import { DEFAULT_SIGNATURE_WORK } from "@/lib/mediaDefaults";
 
 type SignatureItem = {
   id: string;
@@ -14,14 +10,6 @@ type SignatureItem = {
   label: string;
   order_index: number;
 };
-
-const fallbackWorks = [
-  { image_url: bike2, label: "Custom Paint & Wrap", order_index: 0 },
-  { image_url: bike3, label: "Custom Build", order_index: 1 },
-  { image_url: bike1, label: "LED & Neon Lighting", order_index: 2 },
-  { image_url: bike5, label: "Touring Setup", order_index: 3 },
-  { image_url: bike4, label: "Alloy Customization", order_index: 4 },
-];
 
 const AdminSignatureWork = () => {
   const [items, setItems] = useState<SignatureItem[]>([]);
@@ -36,7 +24,7 @@ const AdminSignatureWork = () => {
         <div className="mt-4">
           <p className="text-xs font-heading font-semibold text-primary mb-2">Main Page Currently Shows These Default Images:</p>
           <div className="grid grid-cols-2 gap-3">
-            {fallbackWorks.map((item, idx) => (
+            {DEFAULT_SIGNATURE_WORK.map((item, idx) => (
               <div key={idx} className="bg-card border border-border border-dashed rounded-lg overflow-hidden opacity-75">
                 <img src={item.image_url} alt={item.label} className="w-full h-32 object-cover" />
                 <div className="p-2">
@@ -81,8 +69,8 @@ const AdminSignatureWork = () => {
     setSyncing(true);
     try {
       let successCount = 0;
-      for (let i = 0; i < fallbackWorks.length; i++) {
-        const item = fallbackWorks[i];
+      for (let i = 0; i < DEFAULT_SIGNATURE_WORK.length; i++) {
+        const item = DEFAULT_SIGNATURE_WORK[i];
         const response = await fetch(item.image_url);
         const blob = await response.blob();
         const ext = item.image_url.includes(".png") ? "png" : "jpg";
@@ -105,10 +93,10 @@ const AdminSignatureWork = () => {
         successCount++;
       }
       await fetchItems();
-      if (successCount === fallbackWorks.length) {
+      if (successCount === DEFAULT_SIGNATURE_WORK.length) {
         toast.success("Default images synced to database!");
       } else if (successCount > 0) {
-        toast.success(`Synced ${successCount}/${fallbackWorks.length} images`);
+        toast.success(`Synced ${successCount}/${DEFAULT_SIGNATURE_WORK.length} images`);
       } else {
         toast.error("Sync failed — could not upload any images");
       }
@@ -194,7 +182,7 @@ const AdminSignatureWork = () => {
             </button>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {fallbackWorks.map((item, idx) => (
+            {DEFAULT_SIGNATURE_WORK.map((item, idx) => (
               <div key={idx} className="bg-card border border-border border-dashed rounded-lg overflow-hidden opacity-75">
                 <img src={item.image_url} alt={item.label} className="w-full h-32 object-cover" />
                 <div className="p-2">

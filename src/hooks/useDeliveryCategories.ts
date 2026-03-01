@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
+import { DEFAULT_DELIVERY_CATEGORIES } from "@/lib/mediaDefaults";
 
 export type DeliveryCategory = {
   id: string;
@@ -13,13 +14,23 @@ export function useDeliveryCategories() {
   const [categories, setCategories] = useState<DeliveryCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured() || !supabase) {
-      setError("Supabase not configured");
+      setCategories(
+        DEFAULT_DELIVERY_CATEGORIES.map((cat) => ({
+          ...cat,
+          created_at: "",
+        }))
+      );
+      setError(null);
+      setUsingFallback(true);
       setLoading(false);
       return;
     }
+
+    let active = true;
 
     const fetchCategories = async () => {
       try {
@@ -28,21 +39,68 @@ export function useDeliveryCategories() {
           .select("*")
           .order("order_index");
 
+        if (!active) return;
+
         if (err) {
           setError(err.message);
+          setCategories(
+            DEFAULT_DELIVERY_CATEGORIES.map((cat) => ({
+              ...cat,
+              created_at: "",
+            }))
+          );
+          setUsingFallback(true);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          setCategories(data);
+          setUsingFallback(false);
         } else {
-          setCategories(data || []);
+          setCategories(
+            DEFAULT_DELIVERY_CATEGORIES.map((cat) => ({
+              ...cat,
+              created_at: "",
+            }))
+          );
+          setError(null);
+          setUsingFallback(true);
         }
       } catch (err) {
         console.error("[useDeliveryCategories] Fetch failed:", err);
-        setError("Failed to load categories");
+        if (active) {
+          setError("Failed to load categories");
+          setCategories(
+            DEFAULT_DELIVERY_CATEGORIES.map((cat) => ({
+              ...cat,
+              created_at: "",
+            }))
+          );
+          setUsingFallback(true);
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchCategories();
+
+    const channel = supabase
+      .channel("delivery-categories-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "delivery_categories" },
+        () => {
+          fetchCategories();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  return { categories, loading, error };
+  return { categories, loading, error, usingFallback };
 }

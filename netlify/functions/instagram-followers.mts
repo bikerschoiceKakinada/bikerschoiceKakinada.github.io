@@ -2,8 +2,7 @@ import { getStore } from "@netlify/blobs";
 import { createClient } from "@supabase/supabase-js";
 import type { Context } from "@netlify/functions";
 
-const INSTAGRAM_USERNAME = "bikers_choice_kakinada";
-const INSTAGRAM_URL = `https://www.instagram.com/${INSTAGRAM_USERNAME}/`;
+const INSTAGRAM_USERNAME_FALLBACK = "bikers_choice_kakinada";
 const CACHE_KEY = "instagram-followers";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_FOLLOWERS = 4800;
@@ -79,7 +78,46 @@ function parseFollowerCount(raw: string): number {
   return isNaN(num) ? 0 : num;
 }
 
-async function fetchFromInstagram(): Promise<number | null> {
+function parseInstagramUsername(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const linkMatch = trimmed.match(/instagram\.com\/([^/?#]+)/i);
+  if (linkMatch?.[1]) return linkMatch[1];
+
+  if (trimmed.startsWith("@")) {
+    const handle = trimmed.slice(1);
+    return handle ? handle : null;
+  }
+
+  if (/^[A-Za-z0-9._]+$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  return null;
+}
+
+async function resolveInstagramUsername(): Promise<string> {
+  const sb = getSupabaseClient();
+  if (!sb) return INSTAGRAM_USERNAME_FALLBACK;
+
+  try {
+    const { data } = await sb
+      .from("site_settings")
+      .select("instagram_link")
+      .limit(1)
+      .maybeSingle();
+
+    const parsed = parseInstagramUsername(data?.instagram_link);
+    return parsed || INSTAGRAM_USERNAME_FALLBACK;
+  } catch {
+    return INSTAGRAM_USERNAME_FALLBACK;
+  }
+}
+
+async function fetchFromInstagram(username: string): Promise<number | null> {
+  const instagramUrl = `https://www.instagram.com/${username}/`;
   const userAgents = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -88,7 +126,7 @@ async function fetchFromInstagram(): Promise<number | null> {
   const ua = userAgents[Math.floor(Math.random() * userAgents.length)];
 
   try {
-    const response = await fetch(INSTAGRAM_URL, {
+    const response = await fetch(instagramUrl, {
       headers: {
         "User-Agent": ua,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -198,10 +236,13 @@ export default async (req: Request, context: Context) => {
   try {
     const store = getStore("instagram-cache");
 
+    const username = await resolveInstagramUsername();
+    const cacheKey = `${CACHE_KEY}:${username}`;
+
     // Check blob cache
     let cached: CachedData | null = null;
     try {
-      cached = (await store.get(CACHE_KEY, { type: "json" })) as CachedData | null;
+      cached = (await store.get(cacheKey, { type: "json" })) as CachedData | null;
     } catch {
       // Blobs may not be available in all environments
     }
@@ -214,12 +255,12 @@ export default async (req: Request, context: Context) => {
     }
 
     // Fetch fresh from Instagram
-    const freshCount = await fetchFromInstagram();
+    const freshCount = await fetchFromInstagram(username);
 
     if (freshCount && freshCount > 0) {
       // Cache the result in blobs
       try {
-        await store.setJSON(CACHE_KEY, {
+        await store.setJSON(cacheKey, {
           count: freshCount,
           fetchedAt: Date.now(),
         } satisfies CachedData);
