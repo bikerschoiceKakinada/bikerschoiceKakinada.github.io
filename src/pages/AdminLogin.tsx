@@ -2,8 +2,13 @@ import { useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-
-const ADMIN_EMAIL = "bikerschoicekakinada390@gmail.com";
+import {
+  ADMIN_EMAIL,
+  ensureAdminSeeded,
+  isCurrentUserAdmin,
+  isNetworkLikeError,
+  withNetworkRetry,
+} from "@/lib/adminAuth";
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
@@ -14,8 +19,9 @@ const AdminLogin = () => {
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
 
-    if (!normalizedEmail || !password.trim()) return;
+    if (!normalizedEmail || !normalizedPassword) return;
 
     if (normalizedEmail !== ADMIN_EMAIL) {
       toast.error("Only the configured admin email can access this dashboard.");
@@ -24,13 +30,22 @@ const AdminLogin = () => {
 
     setLoading(true);
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: ADMIN_EMAIL,
-        password,
-      });
-      if (signInError) throw signInError;
+      await ensureAdminSeeded();
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      await withNetworkRetry(async () => {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: ADMIN_EMAIL,
+          password: normalizedPassword,
+        });
+
+        if (error) throw error;
+      }, 3, 700);
+
+      const {
+        data: { user },
+        error: userError,
+      } = await withNetworkRetry(() => supabase.auth.getUser(), 2, 500);
+
       if (userError || !user) throw userError ?? new Error("Unable to verify admin session");
 
       if ((user.email ?? "").toLowerCase() !== ADMIN_EMAIL) {
@@ -39,12 +54,8 @@ const AdminLogin = () => {
         return;
       }
 
-      const { data: isAdmin, error: roleError } = await supabase.rpc("has_role", {
-        _user_id: user.id,
-        _role: "admin",
-      });
-
-      if (roleError || !isAdmin) {
+      const isAdmin = await isCurrentUserAdmin(user.id);
+      if (!isAdmin) {
         await supabase.auth.signOut();
         toast.error("Access denied. Admin role missing.");
         return;
@@ -53,9 +64,13 @@ const AdminLogin = () => {
       toast.success("Welcome, Admin!");
       navigate("/admin/dashboard");
     } catch (err: any) {
-      const message = err?.message || "";
-      if (String(message).toLowerCase().includes("failed to fetch")) {
+      const message = String(err?.message || "");
+      const normalizedMessage = message.toLowerCase();
+
+      if (isNetworkLikeError(err)) {
         toast.error("Network issue while reaching backend. Refresh and try again.");
+      } else if (normalizedMessage.includes("invalid login credentials")) {
+        toast.error("Invalid email or password.");
       } else {
         toast.error(message || "Login failed");
       }

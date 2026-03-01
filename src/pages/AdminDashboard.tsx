@@ -7,8 +7,7 @@ import AdminSignatureWork from "@/components/admin/AdminSignatureWork";
 import AdminGallery from "@/components/admin/AdminGallery";
 import AdminDelivery from "@/components/admin/AdminDelivery";
 import AdminSettings from "@/components/admin/AdminSettings";
-
-const ADMIN_EMAIL = "bikerschoicekakinada390@gmail.com";
+import { ADMIN_EMAIL, isCurrentUserAdmin, isNetworkLikeError, withNetworkRetry } from "@/lib/adminAuth";
 
 const tabs = [
   { id: "signature", label: "Signature Work", icon: Image },
@@ -25,7 +24,13 @@ const AdminDashboard = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+          error: sessionError,
+        } = await withNetworkRetry(() => supabase.auth.getSession(), 2, 500);
+
+        if (sessionError) throw sessionError;
+
         if (!session) {
           navigate("/admin");
           return;
@@ -37,20 +42,21 @@ const AdminDashboard = () => {
           return;
         }
 
-        const { data: isAdmin, error } = await supabase.rpc("has_role", {
-          _user_id: session.user.id,
-          _role: "admin",
-        });
+        const isAdmin = await isCurrentUserAdmin(session.user.id);
 
-        if (error || !isAdmin) {
+        if (!isAdmin) {
           await supabase.auth.signOut();
           navigate("/admin");
           return;
         }
 
         setLoading(false);
-      } catch {
-        toast.error("Could not verify admin session.");
+      } catch (error) {
+        if (isNetworkLikeError(error)) {
+          toast.error("Network issue while validating admin session. Please try again.");
+        } else {
+          toast.error("Could not verify admin session.");
+        }
         navigate("/admin");
       }
     };
@@ -70,7 +76,6 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top bar */}
       <div className="sticky top-0 z-50 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
         <h1 className="font-display text-sm neon-glow-cyan">Admin Panel</h1>
         <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-secondary">
@@ -78,7 +83,6 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-      {/* Tab nav */}
       <div className="overflow-x-auto scrollbar-hide border-b border-border">
         <div className="flex gap-1 px-2 py-2 min-w-max">
           {tabs.map((t) => (
@@ -97,7 +101,6 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-4 max-w-4xl mx-auto">
         {activeTab === "signature" && <AdminSignatureWork />}
         {activeTab === "gallery" && <AdminGallery />}
@@ -109,4 +112,5 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+
 
