@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Trash2, Plus, ChevronRight, ArrowLeft } from "lucide-react";
+import { Trash2, Plus, ChevronRight, ArrowLeft, ImagePlus } from "lucide-react";
 
-type Category = { id: string; name: string; order_index: number };
+type Category = { id: string; name: string; icon_url: string | null; order_index: number };
 type Item = { id: string; category_id: string; image_url: string; label: string; order_index: number };
 
 const AdminDelivery = () => {
@@ -12,6 +12,7 @@ const AdminDelivery = () => {
   const [selectedCat, setSelectedCat] = useState<Category | null>(null);
   const [newCatName, setNewCatName] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadingThumb, setUploadingThumb] = useState<string | null>(null);
 
   const fetchCategories = async () => {
     const { data } = await supabase.from("delivery_categories").select("*").order("order_index");
@@ -35,6 +36,7 @@ const AdminDelivery = () => {
   };
 
   const deleteCategory = async (id: string) => {
+    await supabase.from("delivery_items").delete().eq("category_id", id);
     await supabase.from("delivery_categories").delete().eq("id", id);
     if (selectedCat?.id === id) setSelectedCat(null);
     fetchCategories();
@@ -46,12 +48,28 @@ const AdminDelivery = () => {
     fetchCategories();
   };
 
+  const uploadCategoryThumbnail = async (catId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    setUploadingThumb(catId);
+    const file = e.target.files[0];
+    const ext = file.name.split(".").pop();
+    const path = `delivery/thumbnails/${catId}_${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("uploads").upload(path, file);
+    if (error) { toast.error("Thumbnail upload failed"); setUploadingThumb(null); return; }
+    const { data } = supabase.storage.from("uploads").getPublicUrl(path);
+    await supabase.from("delivery_categories").update({ icon_url: data.publicUrl }).eq("id", catId);
+    fetchCategories();
+    toast.success("Thumbnail updated");
+    setUploadingThumb(null);
+    e.target.value = "";
+  };
+
   const addItem = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length || !selectedCat) return;
     setUploading(true);
     const file = e.target.files[0];
     const ext = file.name.split(".").pop();
-    const path = `delivery/${Date.now()}.${ext}`;
+    const path = `delivery/${selectedCat.id}/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("uploads").upload(path, file);
     if (error) { toast.error("Upload failed"); setUploading(false); return; }
     const { data } = supabase.storage.from("uploads").getPublicUrl(path);
@@ -127,15 +145,28 @@ const AdminDelivery = () => {
       </div>
       <div className="space-y-2">
         {categories.map((cat) => (
-          <div key={cat.id} className="flex items-center gap-2 bg-card border border-border rounded-lg p-3">
-            <input
-              type="text"
-              defaultValue={cat.name}
-              onBlur={(e) => renameCategory(cat.id, e.target.value)}
-              className="flex-1 bg-transparent text-sm text-foreground focus:outline-none"
-            />
-            <button onClick={() => setSelectedCat(cat)} className="text-primary"><ChevronRight size={16} /></button>
-            <button onClick={() => deleteCategory(cat.id)} className="text-secondary"><Trash2 size={14} /></button>
+          <div key={cat.id} className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              {cat.icon_url ? (
+                <img src={cat.icon_url} alt={cat.name} className="w-10 h-10 rounded object-cover flex-shrink-0" />
+              ) : (
+                <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                  <span className="text-muted-foreground text-xs">{cat.name.charAt(0)}</span>
+                </div>
+              )}
+              <input
+                type="text"
+                defaultValue={cat.name}
+                onBlur={(e) => renameCategory(cat.id, e.target.value)}
+                className="flex-1 bg-transparent text-sm text-foreground focus:outline-none"
+              />
+              <label className={`text-primary cursor-pointer ${uploadingThumb === cat.id ? "opacity-50" : ""}`} title="Set thumbnail">
+                <ImagePlus size={16} />
+                <input type="file" accept="image/*" onChange={(e) => uploadCategoryThumbnail(cat.id, e)} className="hidden" disabled={uploadingThumb === cat.id} />
+              </label>
+              <button onClick={() => setSelectedCat(cat)} className="text-primary"><ChevronRight size={16} /></button>
+              <button onClick={() => deleteCategory(cat.id)} className="text-secondary"><Trash2 size={14} /></button>
+            </div>
           </div>
         ))}
       </div>
