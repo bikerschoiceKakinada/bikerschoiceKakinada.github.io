@@ -11,23 +11,28 @@ export function useInstagramFollowers() {
   // Fetch follower count from site_settings
   useEffect(() => {
     const fetchCount = async () => {
-      const { data } = await supabase
-        .from("site_settings")
-        .select("instagram_followers")
-        .limit(1)
-        .single();
+      try {
+        const { data } = await supabase
+          .from("site_settings")
+          .select("instagram_followers")
+          .limit(1)
+          .maybeSingle();
 
-      if (data?.instagram_followers) {
-        const parsed = parseInt(data.instagram_followers.replace(/[^\d]/g, ""), 10);
-        if (!isNaN(parsed) && parsed > 0) {
-          setTargetCount(parsed);
+        if (data?.instagram_followers) {
+          const parsed = parseInt(data.instagram_followers.replace(/[^\d]/g, ""), 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            setTargetCount(parsed);
+          } else {
+            setTargetCount(4800);
+          }
         } else {
           setTargetCount(4800);
         }
-      } else {
+      } catch {
         setTargetCount(4800);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchCount();

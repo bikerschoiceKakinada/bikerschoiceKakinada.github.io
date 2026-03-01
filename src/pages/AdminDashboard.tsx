@@ -22,6 +22,14 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) {
+        toast.error("Session check timed out. Please sign in again.");
+        navigate("/admin");
+      }
+    }, 8000);
+
     const checkAuth = async () => {
       try {
         const {
@@ -32,13 +40,13 @@ const AdminDashboard = () => {
         if (sessionError) throw sessionError;
 
         if (!session) {
-          navigate("/admin");
+          if (!cancelled) navigate("/admin");
           return;
         }
 
         if ((session.user.email ?? "").toLowerCase() !== ADMIN_EMAIL) {
           await supabase.auth.signOut();
-          navigate("/admin");
+          if (!cancelled) navigate("/admin");
           return;
         }
 
@@ -46,18 +54,21 @@ const AdminDashboard = () => {
 
         if (!isAdmin) {
           await supabase.auth.signOut();
-          navigate("/admin");
+          if (!cancelled) navigate("/admin");
           return;
         }
 
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       } catch (error) {
+        if (cancelled) return;
         if (isNetworkLikeError(error)) {
           toast.error("Network issue while validating admin session. Please try again.");
         } else {
           toast.error("Could not verify admin session.");
         }
         navigate("/admin");
+      } finally {
+        if (!cancelled) clearTimeout(timer);
       }
     };
 
@@ -73,6 +84,8 @@ const AdminDashboard = () => {
     });
 
     return () => {
+      cancelled = true;
+      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, [navigate]);

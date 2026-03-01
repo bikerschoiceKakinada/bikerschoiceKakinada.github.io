@@ -18,6 +18,11 @@ const AdminLogin = () => {
 
   // Auto-redirect if already authenticated as admin
   useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) setChecking(false);
+    }, 5000);
+
     const checkExistingSession = async () => {
       try {
         const {
@@ -26,18 +31,27 @@ const AdminLogin = () => {
 
         if (session && (session.user.email ?? "").toLowerCase() === ADMIN_EMAIL) {
           const isAdmin = await isCurrentUserAdmin(session.user.id);
-          if (isAdmin) {
+          if (isAdmin && !cancelled) {
             navigate("/admin/dashboard", { replace: true });
             return;
           }
         }
       } catch {
         // Ignore errors — just show the login form
+      } finally {
+        if (!cancelled) {
+          clearTimeout(timer);
+          setChecking(false);
+        }
       }
-      setChecking(false);
     };
 
     checkExistingSession();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [navigate]);
 
   const handleLogin = async (e: FormEvent) => {
