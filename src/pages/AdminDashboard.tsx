@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { LogOut, Image, Truck, Settings, LayoutGrid } from "lucide-react";
@@ -7,7 +6,7 @@ import AdminSignatureWork from "@/components/admin/AdminSignatureWork";
 import AdminGallery from "@/components/admin/AdminGallery";
 import AdminDelivery from "@/components/admin/AdminDelivery";
 import AdminSettings from "@/components/admin/AdminSettings";
-import { ADMIN_EMAIL, isCurrentUserAdmin, isNetworkLikeError } from "@/lib/adminAuth";
+import { isAdminLoggedIn, adminLogout } from "@/lib/adminAuth";
 
 const tabs = [
   { id: "signature", label: "Signature Work", icon: Image },
@@ -18,100 +17,22 @@ const tabs = [
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("signature");
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const configured = isSupabaseConfigured() && supabase !== null;
-
   useEffect(() => {
-    if (!configured) {
-      toast.error("Supabase environment variables are missing or invalid.");
-      navigate("/admin");
-      return;
+    if (!isAdminLoggedIn()) {
+      navigate("/admin", { replace: true });
     }
+  }, [navigate]);
 
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      if (!cancelled) {
-        toast.error("Session check timed out. Please sign in again.");
-        navigate("/admin");
-      }
-    }, 8000);
-
-    const checkAuth = async () => {
-      try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase!.auth.getSession();
-
-        if (sessionError) throw sessionError;
-
-        if (!session) {
-          if (!cancelled) navigate("/admin");
-          return;
-        }
-
-        if ((session.user.email ?? "").toLowerCase() !== ADMIN_EMAIL) {
-          await supabase!.auth.signOut();
-          if (!cancelled) navigate("/admin");
-          return;
-        }
-
-        const isAdmin = await isCurrentUserAdmin(session.user.id);
-
-        if (!isAdmin) {
-          await supabase!.auth.signOut();
-          if (!cancelled) navigate("/admin");
-          return;
-        }
-
-        if (!cancelled) setLoading(false);
-      } catch (error) {
-        if (cancelled) return;
-        console.error("[AdminDashboard] Auth check failed:", error);
-        if (isNetworkLikeError(error)) {
-          toast.error("Network issue while validating admin session. Please try again.");
-        } else {
-          toast.error("Could not verify admin session.");
-        }
-        navigate("/admin");
-      } finally {
-        if (!cancelled) clearTimeout(timer);
-      }
-    };
-
-    checkAuth();
-
-    // Listen for auth state changes (e.g. session expired, signed out in another tab)
-    const { data: { subscription } } = supabase!.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
-        if (event === "SIGNED_OUT") {
-          navigate("/admin");
-        }
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-      subscription.unsubscribe();
-    };
-  }, [navigate, configured]);
-
-  const handleLogout = async () => {
-    try {
-      await supabase!.auth.signOut();
-      toast.success("Logged out");
-    } catch (err) {
-      console.error("[AdminDashboard] Logout error:", err);
-      toast.error("Logout failed. Please try again.");
-    }
+  const handleLogout = () => {
+    adminLogout();
+    toast.success("Logged out");
     navigate("/admin");
   };
 
-  if (loading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (!isAdminLoggedIn()) {
+    return null;
   }
 
   return (
