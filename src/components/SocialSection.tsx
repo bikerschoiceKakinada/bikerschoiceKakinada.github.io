@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Instagram, Facebook, MessageCircle } from "lucide-react";
+import InstagramCounter from "./InstagramCounter";
 
 const SocialSection = () => {
   return (
@@ -14,7 +15,7 @@ const SocialSection = () => {
           Follow Our Build Journey
         </h2>
         <p className="text-muted-foreground text-sm mb-2">Daily custom work & updates</p>
-        <p className="text-muted-foreground text-sm mb-8">Join 4,800+ riders</p>
+        <p className="text-muted-foreground text-sm mb-8">Join <InstagramCounter /> riders</p>
 
         <div className="flex flex-col gap-3">
           <a

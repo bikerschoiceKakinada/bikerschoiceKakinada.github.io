@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { MessageCircle, Phone, Instagram, MapPin, Truck } from "lucide-react";
 import logo from "@/assets/logo.jpeg";
+import InstagramCounter from "./InstagramCounter";
 
 const HeroSection = () => {
   return (
@@ -45,7 +46,7 @@ const HeroSection = () => {
           </a>
         </div>
 
-        {/* Instagram Badge */}
+        {/* Instagram Badge with live counter */}
         <a
           href="https://www.instagram.com/bikers_choice_kakinada?igsh=MXN4NHd0bnRzY2p3dg=="
           target="_blank"
@@ -53,7 +54,7 @@ const HeroSection = () => {
           className="inline-flex items-center gap-2 bg-surface border px-4 py-2 rounded-full text-xs text-muted-foreground hover:text-primary transition-colors mb-4 shadow font-semibold border-primary">
 
           <Instagram size={14} className="text-primary" />
-          Follow us on Instagram – 4,800+ riders
+          Follow us on Instagram – <InstagramCounter /> riders
         </a>
 
         {/* Location */}

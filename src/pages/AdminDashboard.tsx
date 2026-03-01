@@ -7,7 +7,7 @@ import AdminSignatureWork from "@/components/admin/AdminSignatureWork";
 import AdminGallery from "@/components/admin/AdminGallery";
 import AdminDelivery from "@/components/admin/AdminDelivery";
 import AdminSettings from "@/components/admin/AdminSettings";
-import { ADMIN_EMAIL, isCurrentUserAdmin, isNetworkLikeError, withNetworkRetry } from "@/lib/adminAuth";
+import { ADMIN_EMAIL, isCurrentUserAdmin, isNetworkLikeError } from "@/lib/adminAuth";
 
 const tabs = [
   { id: "signature", label: "Signature Work", icon: Image },
@@ -27,7 +27,7 @@ const AdminDashboard = () => {
         const {
           data: { session },
           error: sessionError,
-        } = await withNetworkRetry(() => supabase.auth.getSession(), 2, 500);
+        } = await supabase.auth.getSession();
 
         if (sessionError) throw sessionError;
 
@@ -62,6 +62,19 @@ const AdminDashboard = () => {
     };
 
     checkAuth();
+
+    // Listen for auth state changes (e.g. session expired, signed out in another tab)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
+        if (event === "SIGNED_OUT") {
+          navigate("/admin");
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const handleLogout = async () => {

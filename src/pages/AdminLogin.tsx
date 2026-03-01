@@ -1,20 +1,44 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ADMIN_EMAIL,
-  ensureAdminSeeded,
+  ensureAdminSeededInBackground,
   isCurrentUserAdmin,
   isNetworkLikeError,
-  withNetworkRetry,
 } from "@/lib/adminAuth";
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const navigate = useNavigate();
+
+  // Auto-redirect if already authenticated as admin
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session && (session.user.email ?? "").toLowerCase() === ADMIN_EMAIL) {
+          const isAdmin = await isCurrentUserAdmin(session.user.id);
+          if (isAdmin) {
+            navigate("/admin/dashboard", { replace: true });
+            return;
+          }
+        }
+      } catch {
+        // Ignore errors — just show the login form
+      }
+      setChecking(false);
+    };
+
+    checkExistingSession();
+  }, [navigate]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,22 +54,21 @@ const AdminLogin = () => {
 
     setLoading(true);
     try {
-      await ensureAdminSeeded();
+      // Fire-and-forget: seed the admin in background — never blocks login
+      ensureAdminSeededInBackground();
 
-      await withNetworkRetry(async () => {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: ADMIN_EMAIL,
-          password: normalizedPassword,
-        });
+      // 1. Sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: ADMIN_EMAIL,
+        password: normalizedPassword,
+      });
+      if (signInError) throw signInError;
 
-        if (error) throw error;
-      }, 3, 700);
-
+      // 2. Verify logged-in user
       const {
         data: { user },
         error: userError,
-      } = await withNetworkRetry(() => supabase.auth.getUser(), 2, 500);
-
+      } = await supabase.auth.getUser();
       if (userError || !user) throw userError ?? new Error("Unable to verify admin session");
 
       if ((user.email ?? "").toLowerCase() !== ADMIN_EMAIL) {
@@ -54,6 +77,7 @@ const AdminLogin = () => {
         return;
       }
 
+      // 3. Check admin role
       const isAdmin = await isCurrentUserAdmin(user.id);
       if (!isAdmin) {
         await supabase.auth.signOut();
@@ -70,14 +94,28 @@ const AdminLogin = () => {
       if (isNetworkLikeError(err)) {
         toast.error("Network issue while reaching backend. Refresh and try again.");
       } else if (normalizedMessage.includes("invalid login credentials")) {
-        toast.error("Invalid email or password.");
+        toast.error("Invalid email or password. Please check your credentials.");
+      } else if (normalizedMessage.includes("email not confirmed")) {
+        toast.error("Email not confirmed. Please check your Supabase dashboard.");
+      } else if (normalizedMessage.includes("user not found")) {
+        toast.error("Admin account not found. The seed-admin edge function may need to be deployed.");
+      } else if (normalizedMessage.includes("timed out")) {
+        toast.error("Request took too long. Please check your internet connection and try again.");
       } else {
-        toast.error(message || "Login failed");
+        toast.error(message || "Login failed. Please try again.");
       }
     } finally {
       setLoading(false);
     }
   };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
+        Checking session...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
