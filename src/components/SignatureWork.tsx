@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import bike1 from "@/assets/bike1.png";
 import bike2 from "@/assets/bike2.png";
 import bike3 from "@/assets/bike3.png";
 import bike4 from "@/assets/bike4.png";
 import bike5 from "@/assets/bike5.png";
-import { useAutoScrollCarousel } from "@/hooks/use-auto-scroll-carousel";
+import SwipeGallery from "./SwipeGallery";
 
 type WorkItem = { id: string; image_url: string; label: string; order_index: number };
 
@@ -20,9 +20,6 @@ const fallbackWorks = [
 
 const SignatureWork = () => {
   const [works, setWorks] = useState<WorkItem[]>(fallbackWorks);
-  const carouselRef = useRef<HTMLDivElement>(null);
-
-  useAutoScrollCarousel(carouselRef, { enabled: works.length > 1, speed: 0.45 });
 
   useEffect(() => {
     const fetch = async () => {
@@ -47,31 +44,24 @@ const SignatureWork = () => {
         <p className="text-center text-muted-foreground text-sm mb-8">Swipe to explore our builds</p>
       </motion.div>
 
-      <div
-        ref={carouselRef}
-        className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-4 touch-pan-x cursor-grab active:cursor-grabbing scroll-smooth"
-      >
-        {works.map((w, i) => (
-          <motion.div
-            key={w.id}
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.08 }}
-            className="flex-shrink-0 w-72 md:w-80 snap-center"
-          >
-            <div className="relative rounded-xl overflow-hidden border border-border neon-border-cyan group">
-              <img src={w.image_url} alt={w.label} className="w-full h-80 object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/80 to-transparent p-4">
-                <span className="font-heading font-semibold text-sm text-primary">{w.label}</span>
-              </div>
+      <SwipeGallery
+        images={works.map((w) => w.image_url)}
+        renderSlide={(image, index) => (
+          <div className="relative rounded-xl overflow-hidden border border-border neon-border-cyan group">
+            <img
+              src={image}
+              alt={works[index].label}
+              className="w-full aspect-[4/5] object-cover transition-transform duration-500 group-hover:scale-110"
+              loading="lazy"
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/80 to-transparent p-4">
+              <span className="font-heading font-semibold text-sm text-primary">{works[index].label}</span>
             </div>
-          </motion.div>
-        ))}
-      </div>
+          </div>
+        )}
+      />
     </section>
   );
 };
 
 export default SignatureWork;
-

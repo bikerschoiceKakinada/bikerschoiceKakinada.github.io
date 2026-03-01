@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { MessageCircle, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import helmets from "@/assets/helmets.jpeg";
 import tyres from "@/assets/tyres.jpeg";
-import { useAutoScrollCarousel } from "@/hooks/use-auto-scroll-carousel";
+import SwipeGallery from "./SwipeGallery";
 
 type Category = { id: string; name: string; order_index: number };
 type Item = { id: string; category_id: string; image_url: string; label: string; order_index?: number };
@@ -36,7 +36,6 @@ const OnlineDelivery = () => {
   const [items, setItems] = useState<Item[]>([]);
   const [hasDb, setHasDb] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<string>(fallbackCategories[0].id);
-  const carouselRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetch = async () => {
@@ -69,8 +68,6 @@ const OnlineDelivery = () => {
     [displayItems, activeCategoryId],
   );
 
-  useAutoScrollCarousel(carouselRef, { enabled: activeItems.length > 1, speed: 0.45 });
-
   return (
     <section id="delivery" className="py-16 px-4">
       <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -95,23 +92,22 @@ const OnlineDelivery = () => {
           ))}
         </div>
 
-        <div
-          ref={carouselRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2 touch-pan-x cursor-grab active:cursor-grabbing scroll-smooth"
-        >
-          {activeItems.map((item) => (
-            <div key={item.id} className="flex-shrink-0 w-72 md:w-80 snap-center bg-card border border-border rounded-xl overflow-hidden">
-              <img src={item.image_url} alt={item.label || "Online delivery item"} className="w-full h-56 object-cover" loading="lazy" />
+        <SwipeGallery
+          key={activeCategoryId}
+          images={activeItems.map((item) => item.image_url)}
+          renderSlide={(image, index) => (
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+              <img src={image} alt={activeItems[index].label || "Online delivery item"} className="w-full h-56 object-cover" loading="lazy" />
               <div className="p-4">
-                {item.label && <p className="text-sm font-heading mb-3">{item.label}</p>}
+                {activeItems[index].label && <p className="text-sm font-heading mb-3">{activeItems[index].label}</p>}
                 <div className="flex gap-2">
                   <a href="https://wa.me/918523876978" target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-primary-foreground font-heading font-semibold py-2 rounded-full text-xs hover:scale-105 transition-transform"><MessageCircle size={14} /> WhatsApp</a>
                   <a href="tel:+918523876978" className="flex-1 flex items-center justify-center gap-1.5 bg-secondary text-secondary-foreground font-heading font-semibold py-2 rounded-full text-xs hover:scale-105 transition-transform"><Phone size={14} /> Call Now</a>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
 
         {activeItems.length === 0 && (
           <p className="text-muted-foreground text-xs p-4 text-center">No items in this category yet. Please check back soon.</p>
@@ -122,4 +118,3 @@ const OnlineDelivery = () => {
 };
 
 export default OnlineDelivery;
-
