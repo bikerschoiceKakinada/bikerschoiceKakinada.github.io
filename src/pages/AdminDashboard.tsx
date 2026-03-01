@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { LogOut, Image, Truck, Settings, LayoutGrid } from "lucide-react";
@@ -21,7 +21,15 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  const configured = isSupabaseConfigured() && supabase !== null;
+
   useEffect(() => {
+    if (!configured) {
+      toast.error("Supabase environment variables are missing or invalid.");
+      navigate("/admin");
+      return;
+    }
+
     let cancelled = false;
     const timer = window.setTimeout(() => {
       if (!cancelled) {
@@ -35,7 +43,7 @@ const AdminDashboard = () => {
         const {
           data: { session },
           error: sessionError,
-        } = await supabase.auth.getSession();
+        } = await supabase!.auth.getSession();
 
         if (sessionError) throw sessionError;
 
@@ -45,7 +53,7 @@ const AdminDashboard = () => {
         }
 
         if ((session.user.email ?? "").toLowerCase() !== ADMIN_EMAIL) {
-          await supabase.auth.signOut();
+          await supabase!.auth.signOut();
           if (!cancelled) navigate("/admin");
           return;
         }
@@ -53,7 +61,7 @@ const AdminDashboard = () => {
         const isAdmin = await isCurrentUserAdmin(session.user.id);
 
         if (!isAdmin) {
-          await supabase.auth.signOut();
+          await supabase!.auth.signOut();
           if (!cancelled) navigate("/admin");
           return;
         }
@@ -61,6 +69,7 @@ const AdminDashboard = () => {
         if (!cancelled) setLoading(false);
       } catch (error) {
         if (cancelled) return;
+        console.error("[AdminDashboard] Auth check failed:", error);
         if (isNetworkLikeError(error)) {
           toast.error("Network issue while validating admin session. Please try again.");
         } else {
@@ -75,7 +84,7 @@ const AdminDashboard = () => {
     checkAuth();
 
     // Listen for auth state changes (e.g. session expired, signed out in another tab)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase!.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
         if (event === "SIGNED_OUT") {
           navigate("/admin");
@@ -88,11 +97,16 @@ const AdminDashboard = () => {
       clearTimeout(timer);
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, configured]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast.success("Logged out");
+    try {
+      await supabase!.auth.signOut();
+      toast.success("Logged out");
+    } catch (err) {
+      console.error("[AdminDashboard] Logout error:", err);
+      toast.error("Logout failed. Please try again.");
+    }
     navigate("/admin");
   };
 
@@ -138,5 +152,3 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
-
-

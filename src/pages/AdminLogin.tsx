@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -16,8 +16,15 @@ const AdminLogin = () => {
   const [checking, setChecking] = useState(true);
   const navigate = useNavigate();
 
+  const configured = isSupabaseConfigured() && supabase !== null;
+
   // Auto-redirect if already authenticated as admin
   useEffect(() => {
+    if (!configured) {
+      setChecking(false);
+      return;
+    }
+
     let cancelled = false;
     const timer = window.setTimeout(() => {
       if (!cancelled) setChecking(false);
@@ -27,7 +34,7 @@ const AdminLogin = () => {
       try {
         const {
           data: { session },
-        } = await supabase.auth.getSession();
+        } = await supabase!.auth.getSession();
 
         if (session && (session.user.email ?? "").toLowerCase() === ADMIN_EMAIL) {
           const isAdmin = await isCurrentUserAdmin(session.user.id);
@@ -36,7 +43,8 @@ const AdminLogin = () => {
             return;
           }
         }
-      } catch {
+      } catch (err) {
+        console.error("[AdminLogin] Session check failed:", err);
         // Ignore errors — just show the login form
       } finally {
         if (!cancelled) {
@@ -52,10 +60,16 @@ const AdminLogin = () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [navigate]);
+  }, [navigate, configured]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
+
+    if (!configured || !supabase) {
+      toast.error("Supabase environment variables are missing or invalid.");
+      return;
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPassword = password.trim();
 
@@ -105,7 +119,11 @@ const AdminLogin = () => {
       const message = String(err?.message || "");
       const normalizedMessage = message.toLowerCase();
 
-      if (isNetworkLikeError(err)) {
+      console.error("[AdminLogin] Login error:", err);
+
+      if (normalizedMessage.includes("supabase environment variables")) {
+        toast.error("Supabase environment variables are missing or invalid.");
+      } else if (isNetworkLikeError(err)) {
         toast.error("Network issue while reaching backend. Refresh and try again.");
       } else if (normalizedMessage.includes("invalid login credentials")) {
         toast.error("Invalid email or password. Please check your credentials.");
@@ -122,6 +140,22 @@ const AdminLogin = () => {
       setLoading(false);
     }
   };
+
+  // Show clear error when Supabase is not configured
+  if (!configured) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="w-full max-w-sm bg-card border border-destructive rounded-xl p-6 space-y-3 text-center">
+          <h1 className="font-display text-lg text-destructive">Configuration Error</h1>
+          <p className="text-sm text-muted-foreground">
+            Supabase environment variables are missing or invalid.<br />
+            Please set <code className="text-xs bg-muted px-1 py-0.5 rounded">VITE_SUPABASE_URL</code> and{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">VITE_SUPABASE_ANON_KEY</code> in your Netlify site settings.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (checking) {
     return (
@@ -167,4 +201,3 @@ const AdminLogin = () => {
 };
 
 export default AdminLogin;
-

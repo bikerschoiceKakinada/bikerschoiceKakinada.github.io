@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import bike1 from "@/assets/bike1.png";
 import bike2 from "@/assets/bike2.png";
 import bike3 from "@/assets/bike3.png";
@@ -22,9 +22,15 @@ const SignatureWork = () => {
   const [works, setWorks] = useState<WorkItem[]>(fallbackWorks);
 
   useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) return;
+
     const fetch = async () => {
-      const { data, error } = await supabase.from("signature_work").select("*").order("order_index");
-      if (!error && data && data.length > 0) setWorks(data);
+      try {
+        const { data, error } = await supabase.from("signature_work").select("*").order("order_index");
+        if (!error && data && data.length > 0) setWorks(data);
+      } catch (err) {
+        console.error("[SignatureWork] Fetch failed:", err);
+      }
     };
 
     fetch();

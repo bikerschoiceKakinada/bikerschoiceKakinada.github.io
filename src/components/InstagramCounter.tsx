@@ -1,14 +1,14 @@
 import { useInstagramFollowers } from "@/hooks/useInstagramFollowers";
 
 const InstagramCounter = () => {
-  const { count, loading } = useInstagramFollowers();
+  const { count, loading, ref } = useInstagramFollowers();
 
   if (loading) return null;
 
   const formatted = count.toLocaleString("en-IN");
 
   return (
-    <span className="tabular-nums">{formatted}+</span>
+    <span ref={ref} className="tabular-nums">{formatted}+</span>
   );
 };
 

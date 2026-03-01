@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import bike1 from "@/assets/bike1.png";
 import bike2 from "@/assets/bike2.png";
 import bike3 from "@/assets/bike3.png";
@@ -28,11 +28,17 @@ const GallerySection = () => {
   const [hasDb, setHasDb] = useState(false);
 
   useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) return;
+
     const fetch = async () => {
-      const { data, error } = await supabase.from("gallery").select("*").order("order_index");
-      if (!error && data && data.length > 0) {
-        setDbImages(data.map((d) => ({ src: d.image_url, cat: d.category })));
-        setHasDb(true);
+      try {
+        const { data, error } = await supabase.from("gallery").select("*").order("order_index");
+        if (!error && data && data.length > 0) {
+          setDbImages(data.map((d) => ({ src: d.image_url, cat: d.category })));
+          setHasDb(true);
+        }
+      } catch (err) {
+        console.error("[GallerySection] Fetch failed:", err);
       }
     };
 

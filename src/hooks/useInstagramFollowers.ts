@@ -1,46 +1,98 @@
-import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
+
+const DEFAULT_FOLLOWERS = 4800;
 
 export function useInstagramFollowers() {
   const [count, setCount] = useState(0);
   const [targetCount, setTargetCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
-  // Fetch follower count from site_settings
+  // Fetch follower count — try Netlify function first, then Supabase, then default
   useEffect(() => {
     const fetchCount = async () => {
+      // Try Netlify function (fetches live from Instagram)
       try {
-        const { data } = await supabase
-          .from("site_settings")
-          .select("instagram_followers")
-          .limit(1)
-          .maybeSingle();
-
-        if (data?.instagram_followers) {
-          const parsed = parseInt(data.instagram_followers.replace(/[^\d]/g, ""), 10);
-          if (!isNaN(parsed) && parsed > 0) {
-            setTargetCount(parsed);
-          } else {
-            setTargetCount(4800);
+        const res = await fetch("/.netlify/functions/instagram-followers");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.count && data.count > 0) {
+            setTargetCount(data.count);
+            setLoading(false);
+            return;
           }
-        } else {
-          setTargetCount(4800);
         }
-      } catch {
-        setTargetCount(4800);
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        console.warn("[useInstagramFollowers] Function call failed:", err);
       }
+
+      // Fall back to Supabase
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          const { data, error } = await supabase
+            .from("site_settings")
+            .select("instagram_followers")
+            .limit(1)
+            .maybeSingle();
+
+          if (!error && data?.instagram_followers) {
+            const raw = String(data.instagram_followers);
+            const parsed = parseInt(raw.replace(/[^\d]/g, ""), 10);
+            if (!isNaN(parsed) && parsed > 0) {
+              setTargetCount(parsed);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("[useInstagramFollowers] Supabase error:", err);
+        }
+      }
+
+      // Default fallback
+      setTargetCount(DEFAULT_FOLLOWERS);
+      setLoading(false);
     };
 
     fetchCount();
   }, []);
 
-  // Animate counter from 0 to target
+  // Callback ref for IntersectionObserver — replays animation every time the element enters viewport
+  const setRef = useCallback((node: HTMLElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    if (node) {
+      observerRef.current = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            // Reset counter to 0 and trigger animation
+            setCount(0);
+            startTimeRef.current = null;
+            setIsVisible(true);
+          } else {
+            setIsVisible(false);
+          }
+        },
+        { threshold: 0.2 }
+      );
+      observerRef.current.observe(node);
+    }
+  }, []);
+
+  // Animate counter from 0 → target every time element becomes visible
   useEffect(() => {
-    if (targetCount === 0) return;
+    if (!isVisible || targetCount === 0) return;
+
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+    startTimeRef.current = null;
 
     const duration = 2000; // 2 seconds
 
@@ -65,7 +117,14 @@ export function useInstagramFollowers() {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [targetCount]);
+  }, [isVisible, targetCount]);
 
-  return { count, targetCount, loading };
+  // Cleanup observer on unmount
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) observerRef.current.disconnect();
+    };
+  }, []);
+
+  return { count, targetCount, loading, ref: setRef };
 }

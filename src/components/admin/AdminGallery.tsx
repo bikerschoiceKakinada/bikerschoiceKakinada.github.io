@@ -18,8 +18,12 @@ const AdminGallery = () => {
   const [uploading, setUploading] = useState(false);
 
   const fetchItems = async () => {
-    const { data } = await supabase.from("gallery").select("*").order("order_index");
-    if (data) setItems(data);
+    try {
+      const { data } = await supabase!.from("gallery").select("*").order("order_index");
+      if (data) setItems(data);
+    } catch (err) {
+      console.error("[AdminGallery] Fetch failed:", err);
+    }
   };
 
   useEffect(() => { fetchItems(); }, []);
@@ -32,10 +36,10 @@ const AdminGallery = () => {
     const file = e.target.files[0];
     const ext = file.name.split(".").pop();
     const path = `gallery/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("uploads").upload(path, file);
+    const { error } = await supabase!.storage.from("uploads").upload(path, file);
     if (error) { toast.error("Upload failed"); setUploading(false); return; }
-    const { data } = supabase.storage.from("uploads").getPublicUrl(path);
-    await supabase.from("gallery").insert({ category: selectedCat, image_url: data.publicUrl, order_index: filtered.length });
+    const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
+    await supabase!.from("gallery").insert({ category: selectedCat, image_url: data.publicUrl, order_index: filtered.length });
     fetchItems();
     toast.success("Added!");
     setUploading(false);
@@ -43,7 +47,7 @@ const AdminGallery = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("gallery").delete().eq("id", id);
+    await supabase!.from("gallery").delete().eq("id", id);
     fetchItems();
     toast.success("Deleted");
   };
