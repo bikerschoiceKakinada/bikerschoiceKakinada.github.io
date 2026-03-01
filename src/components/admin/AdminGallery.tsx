@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, Plus, RefreshCw } from "lucide-react";
 import bike1 from "@/assets/bike1.png";
@@ -36,9 +36,36 @@ const AdminGallery = () => {
   const [syncing, setSyncing] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
+  if (!isSupabaseConfigured() || !supabase) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground text-sm">Database not configured. Please set Supabase environment variables.</p>
+        <div className="mt-4">
+          <p className="text-xs font-heading font-semibold text-primary mb-2">Main Page Currently Shows These Default Images:</p>
+          <div className="grid grid-cols-2 gap-3">
+            {fallbackImages.map((img, idx) => (
+              <div key={idx} className="relative rounded-lg overflow-hidden border border-border border-dashed opacity-75">
+                <img src={img.src} alt={img.cat} className="w-full h-32 object-cover" />
+                <div className="absolute bottom-0 left-0 right-0 bg-background/70 px-2 py-1">
+                  <p className="text-[10px] text-muted-foreground">{img.cat}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const fetchItems = async () => {
     try {
-      const { data } = await supabase!.from("gallery").select("*").order("order_index");
+      const { data, error } = await supabase.from("gallery").select("*").order("order_index");
+      if (error) {
+        console.error("[AdminGallery] Fetch error:", error);
+        toast.error("Failed to load gallery: " + error.message);
+        setLoaded(true);
+        return;
+      }
       if (data) setItems(data);
     } catch (err) {
       console.error("[AdminGallery] Fetch failed:", err);
@@ -55,26 +82,38 @@ const AdminGallery = () => {
   const handleSyncDefaults = async () => {
     setSyncing(true);
     try {
+      let successCount = 0;
       for (let i = 0; i < fallbackImages.length; i++) {
         const img = fallbackImages[i];
         const response = await fetch(img.src);
         const blob = await response.blob();
         const ext = img.src.includes(".png") ? "png" : "jpg";
         const path = `gallery/${Date.now()}_${i}.${ext}`;
-        const { error: uploadError } = await supabase!.storage.from("uploads").upload(path, blob);
+        const { error: uploadError } = await supabase.storage.from("uploads").upload(path, blob);
         if (uploadError) {
           console.error("Upload failed for gallery image", i, uploadError);
           continue;
         }
-        const { data: urlData } = supabase!.storage.from("uploads").getPublicUrl(path);
-        await supabase!.from("gallery").insert({
+        const { data: urlData } = supabase.storage.from("uploads").getPublicUrl(path);
+        const { error: insertError } = await supabase.from("gallery").insert({
           category: img.cat,
           image_url: urlData.publicUrl,
           order_index: i,
         });
+        if (insertError) {
+          console.error("Insert failed for gallery image", i, insertError);
+          continue;
+        }
+        successCount++;
       }
       await fetchItems();
-      toast.success("Default gallery images synced to database!");
+      if (successCount === fallbackImages.length) {
+        toast.success("Default gallery images synced to database!");
+      } else if (successCount > 0) {
+        toast.success(`Synced ${successCount}/${fallbackImages.length} images`);
+      } else {
+        toast.error("Sync failed — could not upload any images");
+      }
     } catch (err) {
       console.error("[AdminGallery] Sync failed:", err);
       toast.error("Sync failed");
@@ -85,23 +124,35 @@ const AdminGallery = () => {
   const handleAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     setUploading(true);
-    const file = e.target.files[0];
-    const ext = file.name.split(".").pop();
-    const path = `gallery/${Date.now()}.${ext}`;
-    const { error } = await supabase!.storage.from("uploads").upload(path, file);
-    if (error) { toast.error("Upload failed"); setUploading(false); return; }
-    const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
-    await supabase!.from("gallery").insert({ category: selectedCat, image_url: data.publicUrl, order_index: filtered.length });
-    fetchItems();
-    toast.success("Added!");
+    try {
+      const file = e.target.files[0];
+      const ext = file.name.split(".").pop();
+      const path = `gallery/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("uploads").upload(path, file);
+      if (error) { toast.error("Upload failed: " + error.message); setUploading(false); return; }
+      const { data } = supabase.storage.from("uploads").getPublicUrl(path);
+      const { error: insertError } = await supabase.from("gallery").insert({ category: selectedCat, image_url: data.publicUrl, order_index: filtered.length });
+      if (insertError) { toast.error("Failed to save image: " + insertError.message); setUploading(false); return; }
+      await fetchItems();
+      toast.success("Added!");
+    } catch (err) {
+      console.error("[AdminGallery] Add failed:", err);
+      toast.error("Failed to add image");
+    }
     setUploading(false);
     e.target.value = "";
   };
 
   const handleDelete = async (id: string) => {
-    await supabase!.from("gallery").delete().eq("id", id);
-    fetchItems();
-    toast.success("Deleted");
+    try {
+      const { error } = await supabase.from("gallery").delete().eq("id", id);
+      if (error) { toast.error("Failed to delete: " + error.message); return; }
+      await fetchItems();
+      toast.success("Deleted");
+    } catch (err) {
+      console.error("[AdminGallery] Delete failed:", err);
+      toast.error("Failed to delete");
+    }
   };
 
   return (

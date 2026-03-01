@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, Plus, RefreshCw } from "lucide-react";
 import bike1 from "@/assets/bike1.png";
@@ -29,9 +29,36 @@ const AdminSignatureWork = () => {
   const [syncing, setSyncing] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
+  if (!isSupabaseConfigured() || !supabase) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground text-sm">Database not configured. Please set Supabase environment variables.</p>
+        <div className="mt-4">
+          <p className="text-xs font-heading font-semibold text-primary mb-2">Main Page Currently Shows These Default Images:</p>
+          <div className="grid grid-cols-2 gap-3">
+            {fallbackWorks.map((item, idx) => (
+              <div key={idx} className="bg-card border border-border border-dashed rounded-lg overflow-hidden opacity-75">
+                <img src={item.image_url} alt={item.label} className="w-full h-32 object-cover" />
+                <div className="p-2">
+                  <p className="text-xs text-muted-foreground">{item.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const fetchItems = async () => {
     try {
-      const { data } = await supabase!.from("signature_work").select("*").order("order_index");
+      const { data, error } = await supabase.from("signature_work").select("*").order("order_index");
+      if (error) {
+        console.error("[AdminSignatureWork] Fetch error:", error);
+        toast.error("Failed to load signature work: " + error.message);
+        setLoaded(true);
+        return;
+      }
       if (data) setItems(data);
     } catch (err) {
       console.error("[AdminSignatureWork] Fetch failed:", err);
@@ -44,35 +71,47 @@ const AdminSignatureWork = () => {
   const uploadImage = async (file: File): Promise<string | null> => {
     const ext = file.name.split(".").pop();
     const path = `signature/${Date.now()}.${ext}`;
-    const { error } = await supabase!.storage.from("uploads").upload(path, file);
-    if (error) { toast.error("Upload failed"); return null; }
-    const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
+    const { error } = await supabase.storage.from("uploads").upload(path, file);
+    if (error) { toast.error("Upload failed: " + error.message); return null; }
+    const { data } = supabase.storage.from("uploads").getPublicUrl(path);
     return data.publicUrl;
   };
 
   const handleSyncDefaults = async () => {
     setSyncing(true);
     try {
+      let successCount = 0;
       for (let i = 0; i < fallbackWorks.length; i++) {
         const item = fallbackWorks[i];
         const response = await fetch(item.image_url);
         const blob = await response.blob();
         const ext = item.image_url.includes(".png") ? "png" : "jpg";
         const path = `signature/${Date.now()}_${i}.${ext}`;
-        const { error: uploadError } = await supabase!.storage.from("uploads").upload(path, blob);
+        const { error: uploadError } = await supabase.storage.from("uploads").upload(path, blob);
         if (uploadError) {
           console.error("Upload failed for", item.label, uploadError);
           continue;
         }
-        const { data: urlData } = supabase!.storage.from("uploads").getPublicUrl(path);
-        await supabase!.from("signature_work").insert({
+        const { data: urlData } = supabase.storage.from("uploads").getPublicUrl(path);
+        const { error: insertError } = await supabase.from("signature_work").insert({
           image_url: urlData.publicUrl,
           label: item.label,
           order_index: i,
         });
+        if (insertError) {
+          console.error("Insert failed for", item.label, insertError);
+          continue;
+        }
+        successCount++;
       }
       await fetchItems();
-      toast.success("Default images synced to database!");
+      if (successCount === fallbackWorks.length) {
+        toast.success("Default images synced to database!");
+      } else if (successCount > 0) {
+        toast.success(`Synced ${successCount}/${fallbackWorks.length} images`);
+      } else {
+        toast.error("Sync failed — could not upload any images");
+      }
     } catch (err) {
       console.error("[AdminSignatureWork] Sync failed:", err);
       toast.error("Sync failed");
@@ -83,25 +122,48 @@ const AdminSignatureWork = () => {
   const handleAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     setUploading(true);
-    const file = e.target.files[0];
-    const url = await uploadImage(file);
-    if (url) {
-      await supabase!.from("signature_work").insert({ image_url: url, label: "", order_index: items.length });
-      fetchItems();
-      toast.success("Added!");
+    try {
+      const file = e.target.files[0];
+      const url = await uploadImage(file);
+      if (url) {
+        const { error } = await supabase.from("signature_work").insert({ image_url: url, label: "", order_index: items.length });
+        if (error) {
+          toast.error("Failed to save image: " + error.message);
+        } else {
+          await fetchItems();
+          toast.success("Added!");
+        }
+      }
+    } catch (err) {
+      console.error("[AdminSignatureWork] Add failed:", err);
+      toast.error("Failed to add image");
     }
     setUploading(false);
     e.target.value = "";
   };
 
   const handleDelete = async (id: string) => {
-    await supabase!.from("signature_work").delete().eq("id", id);
-    fetchItems();
-    toast.success("Deleted");
+    try {
+      const { error } = await supabase.from("signature_work").delete().eq("id", id);
+      if (error) {
+        toast.error("Failed to delete: " + error.message);
+        return;
+      }
+      await fetchItems();
+      toast.success("Deleted");
+    } catch (err) {
+      console.error("[AdminSignatureWork] Delete failed:", err);
+      toast.error("Failed to delete");
+    }
   };
 
   const handleLabelChange = async (id: string, label: string) => {
-    await supabase!.from("signature_work").update({ label }).eq("id", id);
+    try {
+      const { error } = await supabase.from("signature_work").update({ label }).eq("id", id);
+      if (error) console.error("[AdminSignatureWork] Label update error:", error);
+    } catch (err) {
+      console.error("[AdminSignatureWork] Label update failed:", err);
+    }
   };
 
   const showFallback = loaded && items.length === 0;

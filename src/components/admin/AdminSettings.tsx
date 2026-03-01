@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, RefreshCw } from "lucide-react";
 
@@ -18,10 +18,14 @@ const AdminSettings = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
+  const configured = isSupabaseConfigured() && supabase;
+
   useEffect(() => {
+    if (!configured) return;
+
     const fetchSettings = async () => {
       try {
-        const { data, error } = await supabase!.from("site_settings").select("*").limit(1).maybeSingle();
+        const { data, error } = await supabase.from("site_settings").select("*").limit(1).maybeSingle();
         if (error) { console.error("[AdminSettings] Fetch error:", error); return; }
         if (data) {
           setSettings({
@@ -45,7 +49,7 @@ const AdminSettings = () => {
     fetchSettings();
 
     // Listen for real-time updates to settings (e.g. from scheduled auto-update)
-    const channel = supabase!
+    const channel = supabase
       .channel("admin-settings-live")
       .on(
         "postgres_changes",
@@ -65,8 +69,8 @@ const AdminSettings = () => {
       )
       .subscribe();
 
-    return () => { supabase!.removeChannel(channel); };
-  }, []);
+    return () => { supabase.removeChannel(channel); };
+  }, [configured]);
 
   const handleRefreshFollowers = async () => {
     setRefreshing(true);
@@ -92,9 +96,10 @@ const AdminSettings = () => {
   };
 
   const handleSave = async () => {
+    if (!configured) { toast.error("Database not configured"); return; }
     setSaving(true);
     try {
-      const { error } = await supabase!.from("site_settings").update({
+      const payload = {
         hero_subtitle: settings.hero_subtitle,
         instagram_followers: settings.instagram_followers,
         map_embed: settings.map_embed,
@@ -103,9 +108,27 @@ const AdminSettings = () => {
         facebook_link: settings.facebook_link,
         online_delivery_button_enabled: settings.online_delivery_button_enabled,
         updated_at: new Date().toISOString(),
-      }).eq("id", settings.id);
-      if (error) toast.error("Save failed");
-      else toast.success("Settings saved!");
+      };
+
+      let error;
+      if (settings.id) {
+        ({ error } = await supabase.from("site_settings").update(payload).eq("id", settings.id));
+      } else {
+        // No existing row — insert a new one
+        const result = await supabase.from("site_settings").insert(payload).select().single();
+        error = result.error;
+        if (!error && result.data) {
+          setSettings((prev) => ({ ...prev, id: result.data.id }));
+        }
+      }
+
+      if (error) {
+        console.error("[AdminSettings] Save error:", error);
+        toast.error("Save failed: " + error.message);
+      } else {
+        toast.success("Settings saved!");
+        setLastUpdated(new Date().toLocaleString());
+      }
     } catch (err) {
       console.error("[AdminSettings] Save error:", err);
       toast.error("Save failed");
@@ -160,7 +183,7 @@ const AdminSettings = () => {
         </div>
         <div className="flex items-center gap-2 mt-1">
           <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-[10px] text-muted-foreground">Auto-updates every 6 hours</span>
+          <span className="text-[10px] text-muted-foreground">Auto-updates every 2 hours</span>
           {lastUpdated && (
             <span className="text-[10px] text-muted-foreground">· Last updated: {lastUpdated}</span>
           )}
