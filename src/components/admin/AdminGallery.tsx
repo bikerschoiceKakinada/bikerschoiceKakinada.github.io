@@ -2,25 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, Plus, RefreshCw } from "lucide-react";
-import bike1 from "@/assets/bike1.png";
-import bike2 from "@/assets/bike2.png";
-import bike3 from "@/assets/bike3.png";
-import bike4 from "@/assets/bike4.png";
-import bike5 from "@/assets/bike5.png";
-import helmets from "@/assets/helmets.jpeg";
-import tyres from "@/assets/tyres.jpeg";
-
-const CATEGORIES = ["Custom Builds", "LED & Neon", "Wraps & Paint", "Alloy & Tyre", "Before & After", "Workshop"];
-
-const fallbackImages = [
-  { src: bike1, cat: "LED & Neon" },
-  { src: bike2, cat: "Wraps & Paint" },
-  { src: bike3, cat: "Custom Builds" },
-  { src: bike4, cat: "LED & Neon" },
-  { src: bike5, cat: "Custom Builds" },
-  { src: helmets, cat: "Workshop" },
-  { src: tyres, cat: "Alloy & Tyre" },
-];
+import { DEFAULT_GALLERY_CATEGORIES, DEFAULT_GALLERY_IMAGES } from "@/lib/mediaDefaults";
 
 type GalleryItem = {
   id: string;
@@ -31,7 +13,7 @@ type GalleryItem = {
 
 const AdminGallery = () => {
   const [items, setItems] = useState<GalleryItem[]>([]);
-  const [selectedCat, setSelectedCat] = useState(CATEGORIES[0]);
+  const [selectedCat, setSelectedCat] = useState(DEFAULT_GALLERY_CATEGORIES[0]);
   const [uploading, setUploading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -43,7 +25,7 @@ const AdminGallery = () => {
         <div className="mt-4">
           <p className="text-xs font-heading font-semibold text-primary mb-2">Main Page Currently Shows These Default Images:</p>
           <div className="grid grid-cols-2 gap-3">
-            {fallbackImages.map((img, idx) => (
+            {DEFAULT_GALLERY_IMAGES.map((img, idx) => (
               <div key={idx} className="relative rounded-lg overflow-hidden border border-border border-dashed opacity-75">
                 <img src={img.src} alt={img.cat} className="w-full h-32 object-cover" />
                 <div className="absolute bottom-0 left-0 right-0 bg-background/70 px-2 py-1">
@@ -76,15 +58,15 @@ const AdminGallery = () => {
   useEffect(() => { fetchItems(); }, []);
 
   const filtered = items.filter((i) => i.category === selectedCat);
-  const fallbackFiltered = fallbackImages.filter((img) => img.cat === selectedCat);
+  const fallbackFiltered = DEFAULT_GALLERY_IMAGES.filter((img) => img.cat === selectedCat);
   const showFallback = loaded && items.length === 0;
 
   const handleSyncDefaults = async () => {
     setSyncing(true);
     try {
       let successCount = 0;
-      for (let i = 0; i < fallbackImages.length; i++) {
-        const img = fallbackImages[i];
+      for (let i = 0; i < DEFAULT_GALLERY_IMAGES.length; i++) {
+        const img = DEFAULT_GALLERY_IMAGES[i];
         const response = await fetch(img.src);
         const blob = await response.blob();
         const ext = img.src.includes(".png") ? "png" : "jpg";
@@ -107,10 +89,10 @@ const AdminGallery = () => {
         successCount++;
       }
       await fetchItems();
-      if (successCount === fallbackImages.length) {
+      if (successCount === DEFAULT_GALLERY_IMAGES.length) {
         toast.success("Default gallery images synced to database!");
       } else if (successCount > 0) {
-        toast.success(`Synced ${successCount}/${fallbackImages.length} images`);
+        toast.success(`Synced ${successCount}/${DEFAULT_GALLERY_IMAGES.length} images`);
       } else {
         toast.error("Sync failed — could not upload any images");
       }
@@ -159,7 +141,7 @@ const AdminGallery = () => {
     <div>
       <h2 className="font-heading font-bold text-base mb-4">Gallery</h2>
       <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-4 pb-1">
-        {CATEGORIES.map((cat) => (
+        {DEFAULT_GALLERY_CATEGORIES.map((cat) => (
           <button
             key={cat}
             onClick={() => setSelectedCat(cat)}

@@ -16,7 +16,7 @@ const AboutSection = () => {
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        viewport={{ once: false }}
         className="max-w-2xl mx-auto"
       >
         <h2 className="text-xl md:text-3xl font-display font-bold text-center mb-6 neon-glow-cyan">
@@ -33,7 +33,7 @@ const AboutSection = () => {
               key={i}
               initial={{ opacity: 0, x: -10 }}
               whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
+              viewport={{ once: false }}
               transition={{ delay: i * 0.1 }}
               className="flex items-center gap-2 text-sm"
             >

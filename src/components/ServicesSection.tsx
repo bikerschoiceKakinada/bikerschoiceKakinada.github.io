@@ -25,7 +25,7 @@ const ServicesSection = () => {
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        viewport={{ once: false }}
       >
         <h2 className="text-xl md:text-3xl font-display font-bold text-center mb-8 neon-glow-cyan">
           Our Services
@@ -38,7 +38,7 @@ const ServicesSection = () => {
             key={gi}
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: false }}
             transition={{ delay: gi * 0.15 }}
             className="bg-card border border-border rounded-xl p-5"
           >

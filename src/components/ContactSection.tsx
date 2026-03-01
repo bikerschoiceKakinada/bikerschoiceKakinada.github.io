@@ -1,13 +1,21 @@
 import { motion } from "framer-motion";
 import { MessageCircle, Phone, Mail, Instagram, Facebook, MapPin, Clock, Star } from "lucide-react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const ContactSection = () => {
+  const { settings } = useSiteSettings();
+  const facebookLink = settings.facebook_link || "#";
+  const hoursLines = settings.working_hours
+    .split(/\n|\|/g)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
   return (
     <section id="contact" className="py-16 px-4">
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        viewport={{ once: false }}
         className="max-w-2xl mx-auto">
 
         <h2 className="text-xl md:text-3xl font-display font-bold text-center mb-8 neon-glow-red">
@@ -37,11 +45,11 @@ const ContactSection = () => {
             </div>
           </a>
           <div className="flex gap-3">
-            <a href="https://www.instagram.com/bikers_choice_kakinada?igsh=MXN4NHd0bnRzY2p3dg==" target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 bg-card border border-border rounded-xl p-4 hover:border-primary transition-colors">
+            <a href={settings.instagram_link} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 bg-card border border-border rounded-xl p-4 hover:border-primary transition-colors">
               <Instagram size={18} className="text-primary" />
               <span className="text-sm font-heading">Instagram</span>
             </a>
-            <a href="#" target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 bg-card border border-border rounded-xl p-4 hover:border-primary transition-colors">
+            <a href={facebookLink} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 bg-card border border-border rounded-xl p-4 hover:border-primary transition-colors">
               <Facebook size={18} className="text-primary" />
               <span className="text-sm font-heading">Facebook</span>
             </a>
@@ -53,8 +61,9 @@ const ContactSection = () => {
           <Clock size={18} className="text-primary flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-heading font-semibold mb-1">Business Hours</p>
-            <p className="text-foreground text-sm font-bold">Mon – Sat: 9 AM – 9:30 PM</p>
-            <p className="text-sm font-bold text-foreground">Sunday:  9 AM – 1 PM </p>
+            {hoursLines.map((line, idx) => (
+              <p key={idx} className="text-sm font-bold text-foreground">{line}</p>
+            ))}
           </div>
         </div>
 
@@ -71,7 +80,7 @@ const ContactSection = () => {
         {/* Map */}
         <div className="rounded-xl overflow-hidden border border-border">
           <iframe
-            src="https://www.google.com/maps?output=embed&q=Bikers%20Choice%20Kakinada"
+            src={settings.map_embed}
             width="100%"
             height="250"
             style={{ border: 0 }}

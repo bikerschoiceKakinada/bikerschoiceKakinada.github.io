@@ -6,16 +6,16 @@ import CategoryGrid from "./CategoryGrid";
 import CategoryItems from "./CategoryItems";
 
 const OnlineDelivery = () => {
-  const { categories, loading: catsLoading } = useDeliveryCategories();
+  const { categories, loading: catsLoading, usingFallback } = useDeliveryCategories();
   const [selectedCategory, setSelectedCategory] = useState<DeliveryCategory | null>(null);
-  const { items, loading: itemsLoading } = useDeliveryItems(selectedCategory?.id ?? null);
+  const { items, loading: itemsLoading } = useDeliveryItems(selectedCategory?.id ?? null, usingFallback);
 
   return (
     <section id="delivery" className="py-16 px-4">
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        viewport={{ once: false }}
       >
         <h2 className="text-xl md:text-3xl font-display font-bold text-center mb-2 neon-glow-cyan">
           Online Delivery
