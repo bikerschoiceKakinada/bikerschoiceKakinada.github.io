@@ -1,9 +1,48 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { MessageCircle, Phone, Instagram, MapPin, Truck } from "lucide-react";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.jpeg";
 import InstagramCounter from "./InstagramCounter";
 
 const HeroSection = () => {
+  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    const fetchSetting = async () => {
+      try {
+        const { data } = await supabase
+          .from("site_settings")
+          .select("online_delivery_button_enabled")
+          .limit(1)
+          .maybeSingle();
+        if (data && data.online_delivery_button_enabled !== null) {
+          setDeliveryEnabled(data.online_delivery_button_enabled);
+        }
+      } catch (err) {
+        console.error("[HeroSection] Fetch setting failed:", err);
+      }
+    };
+    fetchSetting();
+
+    const channel = supabase
+      .channel("hero-delivery-toggle")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "site_settings" },
+        (payload) => {
+          if (payload.new?.online_delivery_button_enabled !== undefined) {
+            setDeliveryEnabled(payload.new.online_delivery_button_enabled);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   return (
     <section id="home" className="relative min-h-screen flex flex-col items-center justify-center px-4 pt-16 pb-10 overflow-hidden">
       {/* Background glow */}
@@ -66,13 +105,15 @@ const HeroSection = () => {
         </a>
       </motion.div>
 
-      {/* Floating Online Delivery Button */}
-      <a
-        href="#delivery"
-        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 bg-primary text-primary-foreground font-heading font-bold py-2.5 px-4 rounded-full text-xs shadow-lg neon-border-cyan animate-pulse-neon hover:scale-110 transition-transform">
+      {/* Floating Online Delivery Button - controlled by admin settings */}
+      {deliveryEnabled && (
+        <a
+          href="#delivery"
+          className="fixed bottom-20 right-4 z-40 flex items-center gap-2 bg-primary text-primary-foreground font-heading font-bold py-2.5 px-4 rounded-full text-xs shadow-lg neon-border-cyan animate-pulse-neon hover:scale-110 transition-transform">
 
-        <Truck size={16} /> Online Delivery
-      </a>
+          <Truck size={16} /> Online Delivery
+        </a>
+      )}
     </section>);
 
 };

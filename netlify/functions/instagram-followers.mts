@@ -228,7 +228,7 @@ export default async (req: Request, context: Context) => {
       }
 
       // Also auto-save to Supabase so the count persists and triggers real-time updates
-      saveToSupabase(freshCount);
+      await saveToSupabase(freshCount);
 
       return new Response(
         JSON.stringify({ count: freshCount, source: "instagram" }),

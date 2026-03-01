@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, Plus, ChevronRight, ArrowLeft, ImagePlus } from "lucide-react";
 
@@ -13,10 +13,23 @@ const AdminDelivery = () => {
   const [newCatName, setNewCatName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadingThumb, setUploadingThumb] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  if (!isSupabaseConfigured() || !supabase) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground text-sm">Database not configured. Please set Supabase environment variables.</p>
+      </div>
+    );
+  }
 
   const fetchCategories = async () => {
     try {
-      const { data } = await supabase!.from("delivery_categories").select("*").order("order_index");
+      const { data, error } = await supabase.from("delivery_categories").select("*").order("order_index");
+      if (error) {
+        console.error("[AdminDelivery] Fetch categories error:", error);
+        return;
+      }
       if (data) setCategories(data);
     } catch (err) {
       console.error("[AdminDelivery] Fetch categories failed:", err);
@@ -25,7 +38,11 @@ const AdminDelivery = () => {
 
   const fetchItems = async (catId: string) => {
     try {
-      const { data } = await supabase!.from("delivery_items").select("*").eq("category_id", catId).order("order_index");
+      const { data, error } = await supabase.from("delivery_items").select("*").eq("category_id", catId).order("order_index");
+      if (error) {
+        console.error("[AdminDelivery] Fetch items error:", error);
+        return;
+      }
       if (data) setItems(data);
     } catch (err) {
       console.error("[AdminDelivery] Fetch items failed:", err);
@@ -36,38 +53,83 @@ const AdminDelivery = () => {
   useEffect(() => { if (selectedCat) fetchItems(selectedCat.id); }, [selectedCat]);
 
   const addCategory = async () => {
-    if (!newCatName.trim()) return;
-    await supabase!.from("delivery_categories").insert({ name: newCatName.trim(), order_index: categories.length });
-    setNewCatName("");
-    fetchCategories();
-    toast.success("Category added");
+    const trimmed = newCatName.trim();
+    if (!trimmed) {
+      toast.error("Please enter a category name");
+      return;
+    }
+    setAdding(true);
+    try {
+      const { error } = await supabase.from("delivery_categories").insert({ name: trimmed, order_index: categories.length });
+      if (error) {
+        console.error("[AdminDelivery] Add category error:", error);
+        toast.error("Failed to add category: " + error.message);
+        setAdding(false);
+        return;
+      }
+      setNewCatName("");
+      await fetchCategories();
+      toast.success("Category added");
+    } catch (err) {
+      console.error("[AdminDelivery] Add category failed:", err);
+      toast.error("Failed to add category");
+    }
+    setAdding(false);
   };
 
   const deleteCategory = async (id: string) => {
-    await supabase!.from("delivery_items").delete().eq("category_id", id);
-    await supabase!.from("delivery_categories").delete().eq("id", id);
-    if (selectedCat?.id === id) setSelectedCat(null);
-    fetchCategories();
-    toast.success("Category deleted");
+    try {
+      const { error: itemsError } = await supabase.from("delivery_items").delete().eq("category_id", id);
+      if (itemsError) {
+        toast.error("Failed to delete category items: " + itemsError.message);
+        return;
+      }
+      const { error } = await supabase.from("delivery_categories").delete().eq("id", id);
+      if (error) {
+        toast.error("Failed to delete category: " + error.message);
+        return;
+      }
+      if (selectedCat?.id === id) setSelectedCat(null);
+      await fetchCategories();
+      toast.success("Category deleted");
+    } catch (err) {
+      console.error("[AdminDelivery] Delete category failed:", err);
+      toast.error("Failed to delete category");
+    }
   };
 
   const renameCategory = async (id: string, name: string) => {
-    await supabase!.from("delivery_categories").update({ name }).eq("id", id);
-    fetchCategories();
+    try {
+      const { error } = await supabase.from("delivery_categories").update({ name }).eq("id", id);
+      if (error) {
+        toast.error("Failed to rename category: " + error.message);
+        return;
+      }
+      await fetchCategories();
+    } catch (err) {
+      console.error("[AdminDelivery] Rename category failed:", err);
+      toast.error("Failed to rename category");
+    }
   };
 
   const uploadCategoryThumbnail = async (catId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     setUploadingThumb(catId);
-    const file = e.target.files[0];
-    const ext = file.name.split(".").pop();
-    const path = `delivery/thumbnails/${catId}_${Date.now()}.${ext}`;
-    const { error } = await supabase!.storage.from("uploads").upload(path, file);
-    if (error) { toast.error("Thumbnail upload failed"); setUploadingThumb(null); return; }
-    const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
-    await supabase!.from("delivery_categories").update({ icon_url: data.publicUrl }).eq("id", catId);
-    fetchCategories();
-    toast.success("Thumbnail updated");
+    try {
+      const file = e.target.files[0];
+      const ext = file.name.split(".").pop();
+      const path = `delivery/thumbnails/${catId}_${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("uploads").upload(path, file);
+      if (error) { toast.error("Thumbnail upload failed: " + error.message); setUploadingThumb(null); return; }
+      const { data } = supabase.storage.from("uploads").getPublicUrl(path);
+      const { error: updateError } = await supabase.from("delivery_categories").update({ icon_url: data.publicUrl }).eq("id", catId);
+      if (updateError) { toast.error("Failed to save thumbnail: " + updateError.message); setUploadingThumb(null); return; }
+      await fetchCategories();
+      toast.success("Thumbnail updated");
+    } catch (err) {
+      console.error("[AdminDelivery] Upload thumbnail failed:", err);
+      toast.error("Thumbnail upload failed");
+    }
     setUploadingThumb(null);
     e.target.value = "";
   };
@@ -75,28 +137,45 @@ const AdminDelivery = () => {
   const addItem = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length || !selectedCat) return;
     setUploading(true);
-    const file = e.target.files[0];
-    const ext = file.name.split(".").pop();
-    const path = `delivery/${selectedCat.id}/${Date.now()}.${ext}`;
-    const { error } = await supabase!.storage.from("uploads").upload(path, file);
-    if (error) { toast.error("Upload failed"); setUploading(false); return; }
-    const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
-    await supabase!.from("delivery_items").insert({ category_id: selectedCat.id, image_url: data.publicUrl, label: "", order_index: items.length });
-    fetchItems(selectedCat.id);
-    toast.success("Item added");
+    try {
+      const file = e.target.files[0];
+      const ext = file.name.split(".").pop();
+      const path = `delivery/${selectedCat.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("uploads").upload(path, file);
+      if (error) { toast.error("Upload failed: " + error.message); setUploading(false); return; }
+      const { data } = supabase.storage.from("uploads").getPublicUrl(path);
+      const { error: insertError } = await supabase.from("delivery_items").insert({ category_id: selectedCat.id, image_url: data.publicUrl, label: "", order_index: items.length });
+      if (insertError) { toast.error("Failed to add item: " + insertError.message); setUploading(false); return; }
+      await fetchItems(selectedCat.id);
+      toast.success("Item added");
+    } catch (err) {
+      console.error("[AdminDelivery] Add item failed:", err);
+      toast.error("Failed to add item");
+    }
     setUploading(false);
     e.target.value = "";
   };
 
   const deleteItem = async (id: string) => {
     if (!selectedCat) return;
-    await supabase!.from("delivery_items").delete().eq("id", id);
-    fetchItems(selectedCat.id);
-    toast.success("Item deleted");
+    try {
+      const { error } = await supabase.from("delivery_items").delete().eq("id", id);
+      if (error) { toast.error("Failed to delete item: " + error.message); return; }
+      await fetchItems(selectedCat.id);
+      toast.success("Item deleted");
+    } catch (err) {
+      console.error("[AdminDelivery] Delete item failed:", err);
+      toast.error("Failed to delete item");
+    }
   };
 
   const updateItemLabel = async (id: string, label: string) => {
-    await supabase!.from("delivery_items").update({ label }).eq("id", id);
+    try {
+      const { error } = await supabase.from("delivery_items").update({ label }).eq("id", id);
+      if (error) console.error("[AdminDelivery] Update label error:", error);
+    } catch (err) {
+      console.error("[AdminDelivery] Update label failed:", err);
+    }
   };
 
   if (selectedCat) {
@@ -145,9 +224,10 @@ const AdminDelivery = () => {
           placeholder="New category name"
           value={newCatName}
           onChange={(e) => setNewCatName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }}
           className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
         />
-        <button onClick={addCategory} className="bg-primary text-primary-foreground px-3 py-2 rounded-lg text-xs font-heading">
+        <button onClick={addCategory} disabled={adding} className={`bg-primary text-primary-foreground px-3 py-2 rounded-lg text-xs font-heading ${adding ? "opacity-50" : ""}`}>
           <Plus size={14} />
         </button>
       </div>
