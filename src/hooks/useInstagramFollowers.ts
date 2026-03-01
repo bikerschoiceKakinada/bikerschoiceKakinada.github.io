@@ -13,6 +13,12 @@ export function useInstagramFollowers() {
   const startTimeRef = useRef<number | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const targetCountRef = useRef(0);
+
+  // Keep ref in sync with state so subscription/polling callbacks see latest value
+  useEffect(() => {
+    targetCountRef.current = targetCount;
+  }, [targetCount]);
 
   // Parse the stored follower string into a number
   const parseFollowers = useCallback((raw: string | null | undefined): number => {
@@ -41,9 +47,12 @@ export function useInstagramFollowers() {
 
   // Fetch follower count — try Supabase first, then Netlify function, then default
   useEffect(() => {
+    let cancelled = false;
+
     const fetchCount = async () => {
       // 1. Try Supabase first (admin-controlled or auto-updated value)
       const supabaseCount = await fetchFromSupabase();
+      if (cancelled) return;
       if (supabaseCount > 0) {
         setTargetCount(supabaseCount);
         setLoading(false);
@@ -52,10 +61,16 @@ export function useInstagramFollowers() {
 
       // 2. Try Netlify function (fetches live from Instagram)
       try {
-        const res = await fetch("/.netlify/functions/instagram-followers");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch("/.netlify/functions/instagram-followers", {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
-          if (data.count && data.count > 0 && data.source !== "default" && data.source !== "error") {
+          if (data.count && data.count > 0) {
             setTargetCount(data.count);
             setLoading(false);
             return;
@@ -66,14 +81,18 @@ export function useInstagramFollowers() {
       }
 
       // 3. Default fallback
-      setTargetCount(DEFAULT_FOLLOWERS);
-      setLoading(false);
+      if (!cancelled) {
+        setTargetCount(DEFAULT_FOLLOWERS);
+        setLoading(false);
+      }
     };
 
     fetchCount();
+    return () => { cancelled = true; };
   }, [fetchFromSupabase]);
 
   // Real-time subscription — listen for changes to site_settings in Supabase
+  // No targetCount in deps: use ref to avoid tearing down channel on every update
   useEffect(() => {
     if (!isSupabaseConfigured() || !supabase) return;
 
@@ -90,7 +109,7 @@ export function useInstagramFollowers() {
           const newFollowers = payload.new?.instagram_followers;
           if (newFollowers) {
             const parsed = parseFollowers(newFollowers);
-            if (parsed > 0 && parsed !== targetCount) {
+            if (parsed > 0 && parsed !== targetCountRef.current) {
               console.log(`[useInstagramFollowers] Live update: ${parsed}`);
               setTargetCount(parsed);
             }
@@ -102,13 +121,14 @@ export function useInstagramFollowers() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [targetCount, parseFollowers]);
+  }, [parseFollowers]);
 
   // Auto-polling — re-fetch from Supabase every 5 minutes for freshness
+  // No targetCount in deps: use ref to avoid resetting the interval on every update
   useEffect(() => {
     pollTimerRef.current = setInterval(async () => {
       const freshCount = await fetchFromSupabase();
-      if (freshCount > 0 && freshCount !== targetCount) {
+      if (freshCount > 0 && freshCount !== targetCountRef.current) {
         console.log(`[useInstagramFollowers] Poll update: ${freshCount}`);
         setTargetCount(freshCount);
       }
@@ -117,7 +137,7 @@ export function useInstagramFollowers() {
     return () => {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
-  }, [targetCount, fetchFromSupabase]);
+  }, [fetchFromSupabase]);
 
   // Callback ref for IntersectionObserver — replays animation every time the element enters viewport
   const setRef = useCallback((node: HTMLElement | null) => {
