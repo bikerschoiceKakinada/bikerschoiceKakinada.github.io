@@ -1,0 +1,48 @@
+/* SwipeGallery - Embla Carousel responsive styles */
+
+.swipe-gallery {
+  --slide-spacing: 1rem;
+  --slide-size: 100%; /* 1 image on mobile */
+}
+
+@media (min-width: 768px) {
+  .swipe-gallery {
+    --slide-size: 50%; /* 2 images on tablet */
+  }
+}
+
+@media (min-width: 1024px) {
+  .swipe-gallery {
+    --slide-size: 33.3333%; /* 3 images on desktop */
+  }
+}
+
+.swipe-gallery__viewport {
+  overflow: hidden;
+}
+
+.swipe-gallery__container {
+  display: flex;
+  touch-action: pan-y pinch-zoom;
+  margin-left: calc(var(--slide-spacing) * -1);
+}
+
+.swipe-gallery__slide {
+  flex: 0 0 var(--slide-size);
+  min-width: 0;
+  padding-left: var(--slide-spacing);
+}
+
+.swipe-gallery__slide-inner {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  position: relative;
+  aspect-ratio: 4 / 5;
+}
+
+.swipe-gallery__slide-inner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

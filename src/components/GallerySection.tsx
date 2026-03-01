@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import bike1 from "@/assets/bike1.png";
@@ -8,7 +8,7 @@ import bike4 from "@/assets/bike4.png";
 import bike5 from "@/assets/bike5.png";
 import helmets from "@/assets/helmets.jpeg";
 import tyres from "@/assets/tyres.jpeg";
-import { useAutoScrollCarousel } from "@/hooks/use-auto-scroll-carousel";
+import SwipeGallery from "./SwipeGallery";
 
 const categories = ["All", "Custom Builds", "LED & Neon", "Wraps & Paint", "Alloy & Tyre", "Before & After", "Workshop"];
 
@@ -26,7 +26,6 @@ const GallerySection = () => {
   const [filter, setFilter] = useState("All");
   const [dbImages, setDbImages] = useState<{ src: string; cat: string }[]>([]);
   const [hasDb, setHasDb] = useState(false);
-  const carouselRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetch = async () => {
@@ -43,8 +42,6 @@ const GallerySection = () => {
   const images = hasDb ? dbImages : fallbackImages;
   const filtered = filter === "All" ? images : images.filter((img) => img.cat === filter);
 
-  useAutoScrollCarousel(carouselRef, { enabled: filtered.length > 1, speed: 0.5 });
-
   return (
     <section id="gallery" className="py-16 px-4 bg-surface">
       <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -59,16 +56,14 @@ const GallerySection = () => {
         ))}
       </div>
 
-      <div ref={carouselRef} className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2 max-w-5xl mx-auto touch-pan-x cursor-grab active:cursor-grabbing scroll-smooth">
-        {filtered.map((img, i) => (
-          <motion.div key={`${img.src}-${i}`} initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.25, delay: i * 0.05 }} className="flex-shrink-0 w-64 md:w-80 snap-center rounded-lg overflow-hidden border border-border aspect-[4/5]">
-            <img src={img.src} alt={`${img.cat} bike modification by Bikers Choice Kakinada`} className="w-full h-full object-cover" loading="lazy" />
-          </motion.div>
-        ))}
-      </div>
+      <SwipeGallery
+        key={filter}
+        images={filtered.map((img) => img.src)}
+        alts={filtered.map((img) => `${img.cat} bike modification by Bikers Choice Kakinada`)}
+        className="max-w-5xl mx-auto"
+      />
     </section>
   );
 };
 
 export default GallerySection;
-
