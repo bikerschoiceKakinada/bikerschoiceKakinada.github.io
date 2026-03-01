@@ -15,13 +15,21 @@ const AdminDelivery = () => {
   const [uploadingThumb, setUploadingThumb] = useState<string | null>(null);
 
   const fetchCategories = async () => {
-    const { data } = await supabase.from("delivery_categories").select("*").order("order_index");
-    if (data) setCategories(data);
+    try {
+      const { data } = await supabase!.from("delivery_categories").select("*").order("order_index");
+      if (data) setCategories(data);
+    } catch (err) {
+      console.error("[AdminDelivery] Fetch categories failed:", err);
+    }
   };
 
   const fetchItems = async (catId: string) => {
-    const { data } = await supabase.from("delivery_items").select("*").eq("category_id", catId).order("order_index");
-    if (data) setItems(data);
+    try {
+      const { data } = await supabase!.from("delivery_items").select("*").eq("category_id", catId).order("order_index");
+      if (data) setItems(data);
+    } catch (err) {
+      console.error("[AdminDelivery] Fetch items failed:", err);
+    }
   };
 
   useEffect(() => { fetchCategories(); }, []);
@@ -29,22 +37,22 @@ const AdminDelivery = () => {
 
   const addCategory = async () => {
     if (!newCatName.trim()) return;
-    await supabase.from("delivery_categories").insert({ name: newCatName.trim(), order_index: categories.length });
+    await supabase!.from("delivery_categories").insert({ name: newCatName.trim(), order_index: categories.length });
     setNewCatName("");
     fetchCategories();
     toast.success("Category added");
   };
 
   const deleteCategory = async (id: string) => {
-    await supabase.from("delivery_items").delete().eq("category_id", id);
-    await supabase.from("delivery_categories").delete().eq("id", id);
+    await supabase!.from("delivery_items").delete().eq("category_id", id);
+    await supabase!.from("delivery_categories").delete().eq("id", id);
     if (selectedCat?.id === id) setSelectedCat(null);
     fetchCategories();
     toast.success("Category deleted");
   };
 
   const renameCategory = async (id: string, name: string) => {
-    await supabase.from("delivery_categories").update({ name }).eq("id", id);
+    await supabase!.from("delivery_categories").update({ name }).eq("id", id);
     fetchCategories();
   };
 
@@ -54,10 +62,10 @@ const AdminDelivery = () => {
     const file = e.target.files[0];
     const ext = file.name.split(".").pop();
     const path = `delivery/thumbnails/${catId}_${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("uploads").upload(path, file);
+    const { error } = await supabase!.storage.from("uploads").upload(path, file);
     if (error) { toast.error("Thumbnail upload failed"); setUploadingThumb(null); return; }
-    const { data } = supabase.storage.from("uploads").getPublicUrl(path);
-    await supabase.from("delivery_categories").update({ icon_url: data.publicUrl }).eq("id", catId);
+    const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
+    await supabase!.from("delivery_categories").update({ icon_url: data.publicUrl }).eq("id", catId);
     fetchCategories();
     toast.success("Thumbnail updated");
     setUploadingThumb(null);
@@ -70,10 +78,10 @@ const AdminDelivery = () => {
     const file = e.target.files[0];
     const ext = file.name.split(".").pop();
     const path = `delivery/${selectedCat.id}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("uploads").upload(path, file);
+    const { error } = await supabase!.storage.from("uploads").upload(path, file);
     if (error) { toast.error("Upload failed"); setUploading(false); return; }
-    const { data } = supabase.storage.from("uploads").getPublicUrl(path);
-    await supabase.from("delivery_items").insert({ category_id: selectedCat.id, image_url: data.publicUrl, label: "", order_index: items.length });
+    const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
+    await supabase!.from("delivery_items").insert({ category_id: selectedCat.id, image_url: data.publicUrl, label: "", order_index: items.length });
     fetchItems(selectedCat.id);
     toast.success("Item added");
     setUploading(false);
@@ -82,13 +90,13 @@ const AdminDelivery = () => {
 
   const deleteItem = async (id: string) => {
     if (!selectedCat) return;
-    await supabase.from("delivery_items").delete().eq("id", id);
+    await supabase!.from("delivery_items").delete().eq("id", id);
     fetchItems(selectedCat.id);
     toast.success("Item deleted");
   };
 
   const updateItemLabel = async (id: string, label: string) => {
-    await supabase.from("delivery_items").update({ label }).eq("id", id);
+    await supabase!.from("delivery_items").update({ label }).eq("id", id);
   };
 
   if (selectedCat) {

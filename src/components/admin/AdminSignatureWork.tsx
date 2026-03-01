@@ -15,8 +15,12 @@ const AdminSignatureWork = () => {
   const [uploading, setUploading] = useState(false);
 
   const fetchItems = async () => {
-    const { data } = await supabase.from("signature_work").select("*").order("order_index");
-    if (data) setItems(data);
+    try {
+      const { data } = await supabase!.from("signature_work").select("*").order("order_index");
+      if (data) setItems(data);
+    } catch (err) {
+      console.error("[AdminSignatureWork] Fetch failed:", err);
+    }
   };
 
   useEffect(() => { fetchItems(); }, []);
@@ -24,9 +28,9 @@ const AdminSignatureWork = () => {
   const uploadImage = async (file: File): Promise<string | null> => {
     const ext = file.name.split(".").pop();
     const path = `signature/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("uploads").upload(path, file);
+    const { error } = await supabase!.storage.from("uploads").upload(path, file);
     if (error) { toast.error("Upload failed"); return null; }
-    const { data } = supabase.storage.from("uploads").getPublicUrl(path);
+    const { data } = supabase!.storage.from("uploads").getPublicUrl(path);
     return data.publicUrl;
   };
 
@@ -36,7 +40,7 @@ const AdminSignatureWork = () => {
     const file = e.target.files[0];
     const url = await uploadImage(file);
     if (url) {
-      await supabase.from("signature_work").insert({ image_url: url, label: "", order_index: items.length });
+      await supabase!.from("signature_work").insert({ image_url: url, label: "", order_index: items.length });
       fetchItems();
       toast.success("Added!");
     }
@@ -45,13 +49,13 @@ const AdminSignatureWork = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("signature_work").delete().eq("id", id);
+    await supabase!.from("signature_work").delete().eq("id", id);
     fetchItems();
     toast.success("Deleted");
   };
 
   const handleLabelChange = async (id: string, label: string) => {
-    await supabase.from("signature_work").update({ label }).eq("id", id);
+    await supabase!.from("signature_work").update({ label }).eq("id", id);
   };
 
   return (

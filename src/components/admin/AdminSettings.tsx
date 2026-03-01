@@ -18,18 +18,23 @@ const AdminSettings = () => {
 
   useEffect(() => {
     const fetch = async () => {
-      const { data } = await supabase.from("site_settings").select("*").limit(1).single();
-      if (data) {
-        setSettings({
-          id: data.id,
-          hero_subtitle: data.hero_subtitle || "",
-          instagram_followers: data.instagram_followers || "",
-          map_embed: data.map_embed || "",
-          working_hours: data.working_hours || "",
-          instagram_link: data.instagram_link || "",
-          facebook_link: data.facebook_link || "",
-          online_delivery_button_enabled: data.online_delivery_button_enabled ?? true,
-        });
+      try {
+        const { data, error } = await supabase!.from("site_settings").select("*").limit(1).maybeSingle();
+        if (error) { console.error("[AdminSettings] Fetch error:", error); return; }
+        if (data) {
+          setSettings({
+            id: data.id,
+            hero_subtitle: data.hero_subtitle || "",
+            instagram_followers: data.instagram_followers || "",
+            map_embed: data.map_embed || "",
+            working_hours: data.working_hours || "",
+            instagram_link: data.instagram_link || "",
+            facebook_link: data.facebook_link || "",
+            online_delivery_button_enabled: data.online_delivery_button_enabled ?? true,
+          });
+        }
+      } catch (err) {
+        console.error("[AdminSettings] Unexpected error:", err);
       }
     };
     fetch();
@@ -37,19 +42,25 @@ const AdminSettings = () => {
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from("site_settings").update({
-      hero_subtitle: settings.hero_subtitle,
-      instagram_followers: settings.instagram_followers,
-      map_embed: settings.map_embed,
-      working_hours: settings.working_hours,
-      instagram_link: settings.instagram_link,
-      facebook_link: settings.facebook_link,
-      online_delivery_button_enabled: settings.online_delivery_button_enabled,
-      updated_at: new Date().toISOString(),
-    }).eq("id", settings.id);
-    if (error) toast.error("Save failed");
-    else toast.success("Settings saved!");
-    setSaving(false);
+    try {
+      const { error } = await supabase!.from("site_settings").update({
+        hero_subtitle: settings.hero_subtitle,
+        instagram_followers: settings.instagram_followers,
+        map_embed: settings.map_embed,
+        working_hours: settings.working_hours,
+        instagram_link: settings.instagram_link,
+        facebook_link: settings.facebook_link,
+        online_delivery_button_enabled: settings.online_delivery_button_enabled,
+        updated_at: new Date().toISOString(),
+      }).eq("id", settings.id);
+      if (error) toast.error("Save failed");
+      else toast.success("Settings saved!");
+    } catch (err) {
+      console.error("[AdminSettings] Save error:", err);
+      toast.error("Save failed");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const field = (label: string, key: keyof typeof settings, multiline = false) => (
