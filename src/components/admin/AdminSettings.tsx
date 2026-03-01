@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save } from "lucide-react";
+import { Save, RefreshCw } from "lucide-react";
 
 const AdminSettings = () => {
   const [settings, setSettings] = useState({
@@ -15,9 +15,11 @@ const AdminSettings = () => {
     online_delivery_button_enabled: true,
   });
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string>("");
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchSettings = async () => {
       try {
         const { data, error } = await supabase!.from("site_settings").select("*").limit(1).maybeSingle();
         if (error) { console.error("[AdminSettings] Fetch error:", error); return; }
@@ -32,13 +34,62 @@ const AdminSettings = () => {
             facebook_link: data.facebook_link || "",
             online_delivery_button_enabled: data.online_delivery_button_enabled ?? true,
           });
+          if (data.updated_at) {
+            setLastUpdated(new Date(data.updated_at).toLocaleString());
+          }
         }
       } catch (err) {
         console.error("[AdminSettings] Unexpected error:", err);
       }
     };
-    fetch();
+    fetchSettings();
+
+    // Listen for real-time updates to settings (e.g. from scheduled auto-update)
+    const channel = supabase!
+      .channel("admin-settings-live")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "site_settings" },
+        (payload) => {
+          const d = payload.new;
+          if (d) {
+            setSettings((prev) => ({
+              ...prev,
+              instagram_followers: d.instagram_followers || prev.instagram_followers,
+            }));
+            if (d.updated_at) {
+              setLastUpdated(new Date(d.updated_at).toLocaleString());
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase!.removeChannel(channel); };
   }, []);
+
+  const handleRefreshFollowers = async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch("/.netlify/functions/instagram-followers");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.count && data.count > 0 && data.source !== "default" && data.source !== "error") {
+          const formatted = data.count.toLocaleString("en-IN");
+          setSettings((prev) => ({ ...prev, instagram_followers: formatted }));
+          toast.success(`Fetched live count: ${formatted} (source: ${data.source})`);
+        } else {
+          toast.info(`Could not get live count (source: ${data.source}). Current value kept.`);
+        }
+      } else {
+        toast.error("Failed to reach Instagram function");
+      }
+    } catch {
+      toast.error("Failed to refresh follower count");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -88,7 +139,33 @@ const AdminSettings = () => {
     <div className="space-y-4">
       <h2 className="font-heading font-bold text-base">Site Settings</h2>
       {field("Hero Subtitle", "hero_subtitle", true)}
-      {field("Instagram Followers", "instagram_followers")}
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground font-heading">Instagram Followers</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={settings.instagram_followers}
+            onChange={(e) => setSettings({ ...settings, instagram_followers: e.target.value })}
+            className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <button
+            onClick={handleRefreshFollowers}
+            disabled={refreshing}
+            title="Fetch live count from Instagram"
+            className="flex items-center gap-1.5 bg-muted border border-border rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:border-primary transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+            {refreshing ? "Fetching..." : "Live Fetch"}
+          </button>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-[10px] text-muted-foreground">Auto-updates every 6 hours</span>
+          {lastUpdated && (
+            <span className="text-[10px] text-muted-foreground">· Last updated: {lastUpdated}</span>
+          )}
+        </div>
+      </div>
       {field("Instagram Link", "instagram_link")}
       {field("Facebook Link", "facebook_link")}
       {field("Working Hours", "working_hours")}
